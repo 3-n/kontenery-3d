@@ -1,0 +1,15 @@
+// Public settings for the page. The ion token here is the restricted production token:
+// it is visible to anyone and locked to this site's address, assets:read only.
+// It stays empty in the working repo; scripts/deploy.sh fills it in the published copy.
+export const config = {
+  ionToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJub25jZSI6InYxVEFsOHFUOEZnNEoyWnYiLCJqdGkiOiJkMmFmNTc1Yi1lZjhiLTRjMzMtYjhjMC03Y2RjZTAzZjI5MDYiLCJpZCI6NTQzMTI1LCJzdWIiOiIzLW4iLCJpc3MiOiJodHRwczovL2FwaS5jZXNpdW0uY29tIiwiYXVkIjoia29udGVuZXJ5LTNkLXByb2QiLCJpYXQiOjE3OTM4Nzc0MTF9.QEQ6jf_KGt2UwN0HuhNBajd2J64o9tJ66vZFk2Vut34",
+  // "google": Google Photorealistic 3D Tiles through Cesium ion (counts against the monthly quota).
+  // "osm": Cesium OSM Buildings and World Terrain, used in local development.
+  context: "google",
+  localContext: "osm",
+  // Manual adjustments if the map's data shifts: metres east, north, up.
+  offset: { east: 0, north: 0, up: 0 },
+  initialCamera: "overview",
+  shadowDepthBias: 0.0003,
+  modelAmbientBrightness: 2.0,
+};
