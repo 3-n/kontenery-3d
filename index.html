@@ -4,13 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Budynek usługowy przy Terespolskiej: model 3D</title>
-  <script src="https://cdn.jsdelivr.net/npm/cesium@1.147.0/Build/Cesium/Cesium.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/cesium@1.147.0/Build/Cesium/Cesium.js"></script>
   <link href="https://cdn.jsdelivr.net/npm/cesium@1.147.0/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
   <link href="./style.css" rel="stylesheet">
   <link rel="icon" href="data:,">
 </head>
 <body>
-  <div id="map"></div>
+  <div id="map" class="loading"></div>
 
   <details id="panel" open>
     <summary>
@@ -45,6 +45,10 @@
       <p>To nieoficjalna wizualizacja, a nie dokument projektowy.</p>
     </details>
   </details>
+  <script>
+    // Here rather than in main.js, so a phone never shows the panel open and then snapping shut.
+    if (matchMedia("(max-width: 640px)").matches) document.getElementById("panel").open = false;
+  </script>
 
   <div id="info" hidden>
     <button id="info-close" aria-label="Zamknij">×</button>

@@ -1,5 +1,10 @@
 html, body, #map { margin: 0; width: 100%; height: 100%; overflow: hidden; }
-body { font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: #1c2024; }
+body { font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: #1c2024; background: #dfe5e8; }
+
+/* Hidden until the map has something to show: see "show the map" in main.js. Only the canvas, so the credits stay. */
+#map canvas { transition: opacity 0.4s; }
+#map.loading canvas { opacity: 0; }
+#map.loading ~ #status { bottom: 50%; }
 
 #panel, #info, #status {
   position: absolute;

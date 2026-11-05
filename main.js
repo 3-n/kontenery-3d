@@ -11,7 +11,6 @@ if (isLocal && !config.ionToken) {
 const contextName = (isLocal && params.get("context")) || (isLocal ? config.localContext : config.context);
 const useGoogle = contextName === "google";
 const isSmallScreen = matchMedia("(max-width: 640px)").matches;
-if (isSmallScreen) document.getElementById("panel").open = false;
 
 const site = await (await fetch("./site.json")).json();
 const statusEl = document.getElementById("status");
@@ -71,89 +70,21 @@ function localToWorld(matrix, x, y, z) {
   return Cesium.Matrix4.multiplyByPoint(matrix, new Cesium.Cartesian3(x, y, z), new Cesium.Cartesian3());
 }
 
-// --- map context ----------------------------------------------------------------------
-let tileset;
-if (useGoogle) {
-  tileset = await Cesium.createGooglePhotorealistic3DTileset(
-    { onlyUsingWithGoogleGeocoder: true },
-    {
-      maximumScreenSpaceError: isSmallScreen ? 24 : 16,
-      // On by default for these tiles. Before detail loads it reads heights off the coarse mesh and lifts a
-      // street-level camera to about 20 m, for good. Without it you can zoom through the ground, but the view
-      // buttons bring you back.
-      enableCollision: false,
-    },
-  );
-} else {
-  tileset = await Cesium.createOsmBuildingsAsync();
-}
-// Photogrammetry trees are hollow shells with no ground inside. Where the clipping below cuts one open,
-// culled back faces would show a black void; drawing them shows the inside of the crown instead.
-tileset.backFaceCulling = false;
-scene.primitives.add(tileset);
-
-// Ellipsoid height of the ground here, in metres. Used only if sampling fails.
+// Ellipsoid height of the ground here, in metres. Good to a few centimetres, so everything starts from it, and the
+// measured height replaces it once the map is on screen.
 const FALLBACK_HEIGHT = 114.5;
 const PLAUSIBLE_RANGE = 30;
-
-// Anchor the model's height on the map: take the median of (map height - expected local z) over
-// points on open lawn. Never convert the drawings' levels by hand: the drawings and the map use
-// different height systems.
-async function sampleOriginHeight() {
-  const positions = site.groundProbes.map((p) => {
-    const world = localToWorld(enuMatrix(0), p.xy[0], p.xy[1], 0);
-    return Cesium.Cartographic.fromCartesian(world);
-  });
-  const sampled = useGoogle
-    ? await scene.sampleHeightMostDetailed(positions)
-    : await Cesium.sampleTerrainMostDetailed(viewer.terrainProvider, positions);
-  // Cesium can return a far-off height when nothing has loaded. Trust only what's plausible here.
-  const heights = sampled
-    .map((c, i) => (c && c.height !== undefined ? c.height - site.groundProbes[i].z : null))
-    .filter((h) => h !== null && Math.abs(h - FALLBACK_HEIGHT) < PLAUSIBLE_RANGE)
-    .sort((a, b) => a - b);
-  if (heights.length === 0) throw new Error("No usable height samples");
-  return { median: heights[Math.floor(heights.length / 2)], heights };
-}
-
-setStatus("Ustalanie wysokości terenu…");
 let originHeight = FALLBACK_HEIGHT;
 let heightSamples = [];
-try {
-  const result = await sampleOriginHeight();
-  originHeight = result.median;
-  heightSamples = result.heights;
-} catch (error) {
-  console.warn("Height sampling failed, using the default", error);
-}
+let modelMatrix = enuMatrix(originHeight);
 
-const modelMatrix = enuMatrix(originHeight);
-
-// --- clipping: cut the old mesh where the project stands ----------------------------------
-const clippingSupported = Cesium.ClippingPolygonCollection.isSupported(scene);
-if (clippingSupported && site.clipPolygons.length > 0) {
-  tileset.clippingPolygons = new Cesium.ClippingPolygonCollection({
-    polygons: site.clipPolygons.map(
-      (c) => new Cesium.ClippingPolygon({ positions: c.polygon.map(([x, y]) => localToWorld(modelMatrix, x, y, 0)) }),
-    ),
-  });
-}
-
-// --- the model ----------------------------------------------------------------------------
-setStatus("Wczytywanie modelu…");
-const model = await Cesium.Model.fromGltfAsync({
-  url: "./model.glb",
-  modelMatrix,
-  // The model is authored in east-north-up. Cesium's default glTF forward axis (+Z) would turn it 90 degrees.
-  upAxis: Cesium.Axis.Y,
-  forwardAxis: Cesium.Axis.X,
-  shadows: Cesium.ShadowMode.ENABLED,
+// --- startup: nothing above this point waits on the network ------------------------------
+// The viewer opens on the whole Earth, so the camera has to be over the site before the first frame is drawn.
+performance.mark("camera over the site");
+const startup = { highestCamera: 0 };
+const stopWatchingCamera = scene.preRender.addEventListener(() => {
+  startup.highestCamera = Math.max(startup.highestCamera, camera.positionCartographic.height);
 });
-// The map's photos are unlit. Without extra ambient light the dark facades go black in the shade.
-model.environmentMapManager.brightness = config.modelAmbientBrightness;
-// Less of the default ground and sky tint, so graphite stays neutral rather than turning green.
-model.environmentMapManager.saturation = 0.4;
-scene.primitives.add(model);
 
 // --- cameras ----------------------------------------------------------------------------
 function cameraTarget(view) {
@@ -259,6 +190,65 @@ dateInput.addEventListener("input", applyTime);
 timeInput.addEventListener("input", applyTime);
 applyTime();
 
+// --- map context ----------------------------------------------------------------------
+const clippingSupported = Cesium.ClippingPolygonCollection.isSupported(scene);
+
+async function loadMap() {
+  const tileset = useGoogle
+    ? await Cesium.createGooglePhotorealistic3DTileset(
+        { onlyUsingWithGoogleGeocoder: true },
+        {
+          maximumScreenSpaceError: isSmallScreen ? 24 : 16,
+          // On by default for these tiles. Before detail loads it reads heights off the coarse mesh and lifts a
+          // street-level camera to about 20 m, for good. Without it you can zoom through the ground, but the view
+          // buttons bring you back.
+          enableCollision: false,
+          // Go straight to the tiles this view needs, without every coarser level on the way down. On a phone on 4G
+          // this halves the download and the time until the map is sharp, and the final picture is the same.
+          skipLevelOfDetail: true,
+        },
+      )
+    : await Cesium.createOsmBuildingsAsync();
+  // Photogrammetry trees are hollow shells with no ground inside. Where the clipping below cuts one open,
+  // culled back faces would show a black void; drawing them shows the inside of the crown instead.
+  tileset.backFaceCulling = false;
+
+  // Cut the old mesh where the project stands. The polygons lie on the ellipsoid, so the height doesn't affect them.
+  if (clippingSupported && site.clipPolygons.length > 0) {
+    tileset.clippingPolygons = new Cesium.ClippingPolygonCollection({
+      polygons: site.clipPolygons.map(
+        (c) => new Cesium.ClippingPolygon({ positions: c.polygon.map(([x, y]) => localToWorld(modelMatrix, x, y, 0)) }),
+      ),
+    });
+  }
+  scene.primitives.add(tileset);
+  performance.mark("map opened");
+  return tileset;
+}
+
+// --- the model ----------------------------------------------------------------------------
+async function loadModel() {
+  const model = await Cesium.Model.fromGltfAsync({
+    url: "./model.glb",
+    modelMatrix,
+    // The model is authored in east-north-up. Cesium's default glTF forward axis (+Z) would turn it 90 degrees.
+    upAxis: Cesium.Axis.Y,
+    forwardAxis: Cesium.Axis.X,
+    shadows: Cesium.ShadowMode.ENABLED,
+  });
+  // The map's photos are unlit. Without extra ambient light the dark facades go black in the shade.
+  model.environmentMapManager.brightness = config.modelAmbientBrightness;
+  // Less of the default ground and sky tint, so graphite stays neutral rather than turning green.
+  model.environmentMapManager.saturation = 0.4;
+  scene.primitives.add(model);
+  performance.mark("model file read");
+  return model;
+}
+
+// The model first. It's a small file, but it would otherwise wait behind hundreds of map tiles: about 10 s on 4G.
+const model = await loadModel();
+const tileset = await loadMap();
+
 // --- before and after ------------------------------------------------------------------------
 document.getElementById("project").addEventListener("change", (event) => {
   model.show = event.target.checked;
@@ -296,7 +286,92 @@ new Cesium.ScreenSpaceEventHandler(viewer.canvas).setInputAction((click) => {
 if (!clippingSupported) {
   console.warn("Clipping polygons are not supported here: the old map mesh stays visible under the project.");
 }
-setStatus("");
 
-// Test hook, used by scripts/shots.mjs.
-window.app = { viewer, tileset, model, modelMatrix, originHeight, heightSamples, goTo, stopOrbit, localToWorld, cameraTarget, contextName };
+// --- show the map once there's something to see ---------------------------------------------
+// Until then the canvas is hidden (the "loading" class in index.html), because all it can show is a black void.
+const DETAILED_TILE_ERROR_M = 100; // a tile this fine means the ground is recognisable
+const SHOW_ANYWAY_MS = 20000; // on a slow connection, a partly loaded map beats an empty page
+
+const mapHasDetail = new Promise((resolve) => {
+  if (!useGoogle) return resolve(); // the OSM context has its globe from the start
+  const stop = tileset.tileVisible.addEventListener((tile) => {
+    if (tile.geometricError <= DETAILED_TILE_ERROR_M) {
+      stop();
+      resolve();
+    }
+  });
+});
+const mapSettled = new Promise((resolve) => tileset.initialTilesLoaded.addEventListener(() => resolve()));
+const modelReady = new Promise((resolve) => (model.ready ? resolve() : model.readyEvent.addEventListener(() => resolve())));
+mapHasDetail.then(() => performance.mark("map has detail"));
+modelReady.then(() => performance.mark("model ready"));
+const loaded = Promise.all([mapHasDetail, modelReady]);
+mapSettled.then(() => {
+  performance.mark("map settled");
+  setStatus(""); // the blurred map still needs explaining until then
+});
+
+const mapShown = Promise.race([loaded, new Promise((resolve) => setTimeout(resolve, SHOW_ANYWAY_MS))]).then(() => {
+  stopWatchingCamera();
+  document.getElementById("map").classList.remove("loading");
+  performance.mark("map shown");
+});
+
+// --- measure the ground ------------------------------------------------------------------------
+// Anchor the model's height on the map: take the median of (map height - expected local z) over
+// points on open lawn. Never convert the drawings' levels by hand: the drawings and the map use
+// different height systems.
+async function sampleOriginHeight() {
+  const positions = site.groundProbes.map((p) => {
+    const world = localToWorld(enuMatrix(0), p.xy[0], p.xy[1], 0);
+    return Cesium.Cartographic.fromCartesian(world);
+  });
+  const sampled = useGoogle
+    ? await scene.sampleHeightMostDetailed(positions, [model]) // the map's height, not the top of the model above it
+    : await Cesium.sampleTerrainMostDetailed(viewer.terrainProvider, positions);
+  // Cesium can return a far-off height when nothing has loaded. Trust only what's plausible here.
+  const heights = sampled
+    .map((c, i) => (c && c.height !== undefined ? c.height - site.groundProbes[i].z : null))
+    .filter((h) => h !== null && Math.abs(h - FALLBACK_HEIGHT) < PLAUSIBLE_RANGE)
+    .sort((a, b) => a - b);
+  if (heights.length === 0) throw new Error("No usable height samples");
+  return { median: heights[Math.floor(heights.length / 2)], heights };
+}
+
+// Not until the map is showing: this fetches the most detailed tiles under each probe, which would compete with the
+// tiles the camera is waiting for. An orbit in progress keeps its old centre, which is only centimetres off.
+const heightSettled = mapShown.then(async () => {
+  try {
+    const result = await sampleOriginHeight();
+    originHeight = result.median;
+    heightSamples = result.heights;
+    modelMatrix = enuMatrix(originHeight);
+    model.modelMatrix = modelMatrix;
+    performance.mark("height measured");
+  } catch (error) {
+    console.warn("Height sampling failed, using the default", error);
+  }
+});
+
+// Test hook, used by scripts/shots.mjs and scripts/test_page.mjs.
+window.app = {
+  viewer,
+  tileset,
+  model,
+  get modelMatrix() {
+    return modelMatrix;
+  },
+  get originHeight() {
+    return originHeight;
+  },
+  get heightSamples() {
+    return heightSamples;
+  },
+  heightSettled,
+  startup,
+  goTo,
+  stopOrbit,
+  localToWorld,
+  cameraTarget,
+  contextName,
+};
