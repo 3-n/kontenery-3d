@@ -4,9 +4,9 @@
 export const config = {
   ionToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJub25jZSI6InYxVEFsOHFUOEZnNEoyWnYiLCJqdGkiOiJkMmFmNTc1Yi1lZjhiLTRjMzMtYjhjMC03Y2RjZTAzZjI5MDYiLCJpZCI6NTQzMTI1LCJzdWIiOiIzLW4iLCJpc3MiOiJodHRwczovL2FwaS5jZXNpdW0uY29tIiwiYXVkIjoia29udGVuZXJ5LTNkLXByb2QiLCJpYXQiOjE3OTM4Nzc0MTF9.QEQ6jf_KGt2UwN0HuhNBajd2J64o9tJ66vZFk2Vut34",
   // "google": Google Photorealistic 3D Tiles through Cesium ion (counts against the monthly quota).
-  // "osm": Cesium OSM Buildings and World Terrain, used in local development.
+  // "geoportal": GUGiK's aerial photo on the surveyed ground, with Cesium OSM Buildings. The page has a switch between them.
   context: "google",
-  localContext: "osm",
+  localContext: "geoportal",
   // Manual adjustments if the map's data shifts: metres east, north, up.
   offset: { east: 0, north: 0, up: 0 },
   initialCamera: "overview",

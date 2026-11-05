@@ -46,6 +46,7 @@ input[type="range"] { width: 100%; margin: 4px 0 0; }
 output { font-variant-numeric: tabular-nums; font-weight: 600; }
 .check { display: flex; gap: 6px; align-items: center; cursor: pointer; }
 .note { margin: 6px 0 0; font-size: 12px; color: #8a4b00; }
+.hint { margin: 6px 0 0; font-size: 12px; color: #5a6168; }
 
 #about { margin-top: 14px; font-size: 12.5px; border-top: 1px solid #e0e3e6; padding-top: 8px; }
 #about summary { cursor: pointer; font-weight: 600; }

@@ -28,8 +28,9 @@ To nieoficjalna wizualizacja poglądowa, a nie dokument projektowy.
 - Mapa jest wycięta pod projektowanymi nawierzchniami, razem z fragmentami koron drzew nad nimi. Pozostałe drzewa zostają, bo projekt nie mówi, które będą usunięte.
 - Ciemne plamy na zdjęciach mapy to cienie z dnia nalotu. Nie zmieniają się z godziną.
 - Mapa nie jest aktualna: nie ma na niej m.in. istniejącej tężni.
-- Mapa 3D jest wczytywana tylko do około 800 m od działki, żeby strona działała płynnie. Dalej widać jednolite tło.
+- Mapa jest wczytywana tylko do około 800 m od działki, żeby strona działała płynnie. Dalej widać jednolite tło.
+- Mapa Geoportal jest aktualna, ale budynki są na niej uproszczone, a drzewa płaskie, więc nie rzucają cieni. Mapa Google ma drzewa i cienie, ale jest starsza.
 
 ## Uznanie autorstwa
 
-Dane mapy: Google, widoczne na stronie razem z logo. Silnik: [CesiumJS](https://cesium.com/platform/cesiumjs/) (Apache 2.0), przez Cesium ion. Podkład lokalny do testów: OpenStreetMap.
+Dane mapy: Google, widoczne na stronie razem z logo. Silnik: [CesiumJS](https://cesium.com/platform/cesiumjs/) (Apache 2.0), przez Cesium ion. Mapa Geoportal: ortofotomapa GUGiK z geoportal.gov.pl i bryły budynków z OpenStreetMap przez Cesium ion.

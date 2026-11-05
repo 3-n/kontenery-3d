@@ -21,6 +21,14 @@
     <h2>Widok</h2>
     <div id="cameras" class="buttons"></div>
 
+    <h2>Mapa</h2>
+    <div class="buttons" id="maps">
+      <button data-map="google">Google 3D</button>
+      <button data-map="geoportal">Geoportal 2025</button>
+    </div>
+    <p class="hint" id="map-note-google" hidden>Realistyczna, ale sprzed kilku lat: brakuje na niej nowszych budynków.</p>
+    <p class="hint" id="map-note-geoportal" hidden>Aktualne zdjęcie lotnicze i uproszczone bryły budynków. Drzewa są płaskie i nie rzucają cieni.</p>
+
     <h2>Słońce i cienie</h2>
     <div class="buttons" id="dates">
       <button data-date="03-20">Równonoc</button>
@@ -41,7 +49,8 @@
       <p>Położenie względem geodezji: około ±0,2 m. Sama mapa 3D ma własny błąd: nałożona na nią granica działki zgadza się na oko do około metra.</p>
       <p>Szacunkowe, bo nieopisane w projekcie: wysokość drzew, latarni i słupa ogłoszeniowego oraz kolory wykończeń. Tężnia jest odtworzona z obrysu na mapie do celów projektowych i ze zdjęcia, które pokazuje trzy z ośmiu ścian. Pozostałe ściany przyjęto analogicznie.</p>
       <p>Pod projektowanymi nawierzchniami mapa jest wycięta, razem z fragmentami koron drzew nad nimi. Pokazuje to odznaczenie „Pokaż projekt”. Pozostałe drzewa zostają, bo projekt nie mówi, które będą usunięte.</p>
-      <p>Mapa 3D jest wczytywana tylko do około 800 m od działki, żeby strona działała płynnie. Dalej widać jednolite tło.</p>
+      <p>Mapa jest wczytywana tylko do około 800 m od działki, żeby strona działała płynnie. Dalej widać jednolite tło.</p>
+      <p>Mapa Geoportal: zdjęcie lotnicze GUGiK z 2025 r. i bryły budynków z OpenStreetMap, na terenie z mapy do celów projektowych.</p>
       <p>Cienie modelu i brył mapy są liczone na żywo. Ciemne plamy na samych zdjęciach mapy to cienie z dnia nalotu i nie zmieniają się z godziną.</p>
       <p>To nieoficjalna wizualizacja, a nie dokument projektowy.</p>
     </details>
