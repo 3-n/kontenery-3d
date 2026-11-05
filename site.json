@@ -448,6 +448,14 @@
    ]
   }
  ],
+ "mapLimit": {
+  "centre": [
+   -6,
+   18
+  ],
+  "radius": 800,
+  "sides": 4
+ },
  "placementCheck": {
   "local": [
    2.092,

@@ -28,6 +28,7 @@ To nieoficjalna wizualizacja poglądowa, a nie dokument projektowy.
 - Mapa jest wycięta pod projektowanymi nawierzchniami, razem z fragmentami koron drzew nad nimi. Pozostałe drzewa zostają, bo projekt nie mówi, które będą usunięte.
 - Ciemne plamy na zdjęciach mapy to cienie z dnia nalotu. Nie zmieniają się z godziną.
 - Mapa nie jest aktualna: nie ma na niej m.in. istniejącej tężni.
+- Mapa 3D jest wczytywana tylko do około 800 m od działki, żeby strona działała płynnie. Dalej widać jednolite tło.
 
 ## Uznanie autorstwa
 

@@ -53,6 +53,9 @@ Object.assign(viewer.shadowMap, {
 // This private setting is the remaining control; the CesiumJS version is pinned in index.html.
 viewer.shadowMap._primitiveBias.depthBias = config.shadowDepthBias;
 scene.skyAtmosphere.show = true;
+scene.skyBox.show = false; // no stars: the sky here doesn't follow the clock anyway, and that's six fewer images to download
+// Zooming out further than this would show the map as a slab with edges.
+scene.screenSpaceCameraController.maximumZoomDistance = 700;
 
 // --- local east-north-up frame at the reference point ------------------------------
 const lonDeg = site.reference.lon;
@@ -77,6 +80,28 @@ const PLAUSIBLE_RANGE = 30;
 let originHeight = FALLBACK_HEIGHT;
 let heightSamples = [];
 let modelMatrix = enuMatrix(originHeight);
+
+// The map stops at site.mapLimit, and the Google context has no globe. Below the horizon the sky is black, so past the
+// map's edge this plain floor, a little below the ground, shows instead. Not used by the OSM context, which has its globe.
+const HAZE_FLOOR_BELOW_GROUND_M = 8;
+if (useGoogle) {
+  scene.primitives.add(
+    new Cesium.Primitive({
+      geometryInstances: new Cesium.GeometryInstance({
+        geometry: new Cesium.EllipseGeometry({
+          center: Cesium.Cartesian3.fromDegrees(lonDeg, latDeg),
+          semiMajorAxis: 100000,
+          semiMinorAxis: 100000,
+          height: FALLBACK_HEIGHT - HAZE_FLOOR_BELOW_GROUND_M,
+          vertexFormat: Cesium.PerInstanceColorAppearance.FLAT_VERTEX_FORMAT,
+        }),
+        attributes: { color: Cesium.ColorGeometryInstanceAttribute.fromColor(Cesium.Color.fromCssColorString("#c9d2cb")) },
+      }),
+      appearance: new Cesium.PerInstanceColorAppearance({ flat: true, translucent: false }),
+      asynchronous: false,
+    }),
+  );
+}
 
 // --- startup: nothing above this point waits on the network ------------------------------
 // The viewer opens on the whole Earth, so the camera has to be over the site before the first frame is drawn.
@@ -193,6 +218,25 @@ applyTime();
 // --- map context ----------------------------------------------------------------------
 const clippingSupported = Cesium.ClippingPolygonCollection.isSupported(scene);
 
+// Keep only the map around the site. Planes rather than a clipping polygon, because Cesium skips tiles that are wholly
+// outside a plane without downloading them, while a polygon only hides them once they're loaded.
+function mapLimitPlanes(tileset) {
+  const { centre, radius, sides } = site.mapLimit;
+  const planes = [];
+  for (let i = 0; i < sides; i++) {
+    const angle = (i * 2 * Math.PI) / sides;
+    planes.push(new Cesium.ClippingPlane(new Cesium.Cartesian3(-Math.cos(angle), -Math.sin(angle), 0), radius));
+  }
+  const atSite = Cesium.Transforms.eastNorthUpToFixedFrame(localToWorld(modelMatrix, centre[0], centre[1], 0));
+  // Cesium applies planes relative to this tileset's own origin. A private property, but the version is pinned in index.html.
+  const fromOrigin = Cesium.Matrix4.inverseTransformation(tileset.clippingPlanesOriginMatrix, new Cesium.Matrix4());
+  return new Cesium.ClippingPlaneCollection({
+    planes,
+    unionClippingRegions: true, // clip what's outside any plane, which leaves the inside of the octagon
+    modelMatrix: Cesium.Matrix4.multiply(fromOrigin, atSite, new Cesium.Matrix4()),
+  });
+}
+
 async function loadMap() {
   const tileset = useGoogle
     ? await Cesium.createGooglePhotorealistic3DTileset(
@@ -221,6 +265,7 @@ async function loadMap() {
       ),
     });
   }
+  tileset.clippingPlanes = mapLimitPlanes(tileset);
   scene.primitives.add(tileset);
   performance.mark("map opened");
   return tileset;
