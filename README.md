@@ -19,7 +19,9 @@ To nieoficjalna wizualizacja poglądowa, a nie dokument projektowy.
 
 **Odczytane z rysunków:** wymiary budynku, tarasu, parkingu i ścieżek, rzędne wysokości, położenie okien, drzwi i małej architektury.
 
-**Szacunkowe, bo nieopisane w projekcie:** wysokość drzew, latarni i słupa ogłoszeniowego, gatunki i wielkość drzew, kolory wykończeń, przeszklenie drzwi. Tężnia to bryła zastępcza: projekt podaje tylko jej obrys.
+**Szacunkowe, bo nieopisane w projekcie:** wysokość drzew, latarni i słupa ogłoszeniowego, gatunki i wielkość drzew, kolory wykończeń, przeszklenie drzwi.
+
+**Tężnia:** obrys z mapy do celów projektowych, wysokości i wykończenie odczytane ze zdjęcia, które pokazuje trzy z ośmiu ścian. Pozostałe ściany przyjęto analogicznie. Tekstury są wygenerowane, a samo zdjęcie nie jest częścią modelu.
 
 ## Znane ograniczenia
 

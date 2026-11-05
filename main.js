@@ -166,10 +166,37 @@ function cameraTarget(view) {
   return { destination: eye, orientation: { direction, up: trueUp } };
 }
 
+// Views marked "orbit" turn around their target. With the camera in a frame centred on the target, Cesium's own
+// controls orbit that point: drag or one finger to turn, wheel or pinch to zoom.
+const MIN_ORBIT_ELEVATION = Cesium.Math.toRadians(15); // keeps the camera above the neighbouring roofs at the preset distance
+let orbiting = false;
+
+function startOrbit(view) {
+  camera.lookAtTransform(Cesium.Transforms.eastNorthUpToFixedFrame(localToWorld(modelMatrix, ...view.target)));
+  camera.constrainedAxis = Cesium.Cartesian3.UNIT_Z;
+  orbiting = true;
+}
+
+function stopOrbit() {
+  if (!orbiting) return;
+  camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
+  camera.constrainedAxis = undefined;
+  orbiting = false;
+}
+
+// Collision is off, so nothing else stops the camera going down through the ground.
+scene.preRender.addEventListener(() => {
+  if (!orbiting) return;
+  const elevation = Math.asin(camera.position.z / Cesium.Cartesian3.magnitude(camera.position));
+  // rotateDown raises the eye: Cesium names these after the way the view turns, not the way the eye moves.
+  if (elevation < MIN_ORBIT_ELEVATION) camera.rotateDown(MIN_ORBIT_ELEVATION - elevation);
+});
+
 const cameraButtons = document.getElementById("cameras");
 function goTo(id, duration = 1.6) {
   const view = site.cameras.find((c) => c.id === id);
-  camera.flyTo({ ...cameraTarget(view), duration });
+  stopOrbit();
+  camera.flyTo({ ...cameraTarget(view), duration, complete: view.orbit ? () => startOrbit(view) : undefined });
   for (const b of cameraButtons.children) b.classList.toggle("active", b.dataset.id === id);
 }
 for (const view of site.cameras) {
@@ -272,4 +299,4 @@ if (!clippingSupported) {
 setStatus("");
 
 // Test hook, used by scripts/shots.mjs.
-window.app = { viewer, tileset, model, modelMatrix, originHeight, heightSamples, goTo, localToWorld, cameraTarget, contextName };
+window.app = { viewer, tileset, model, modelMatrix, originHeight, heightSamples, goTo, stopOrbit, localToWorld, cameraTarget, contextName };
