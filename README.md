@@ -9,8 +9,8 @@ To nieoficjalna wizualizacja poglądowa, a nie dokument projektowy.
 - **Bryła i zagospodarowanie:** projekt budowlany zatwierdzony decyzją nr 142/PPD/PB/2026 (rysunki Z-01, A-01 do A-04) oraz mapa do celów projektowych z 15.07.2026.
 - **Położenie:** rysunek Z-01 dowiązany do krzyży siatki PL-2000 strefa 7 (EPSG:2178). Błąd dowiązania: 0,10 m RMS.
 - **Granica działki do sprawdzenia:** usługa ULDK (GUGiK).
-- **Mapa 3D:** Google Photorealistic 3D Tiles przez Cesium ion, pobierana na żywo. Ta strona nie przechowuje żadnych danych tej mapy.
-- **Mapa Geoportal:** ortofotomapa GUGiK z 2025 r., pobierana na żywo z geoportal.gov.pl, oraz modele 3D budynków (LoD1, 2024) i drzew (LoD1, 2023) GUGiK. Modele są przycięte do około 800 m od działki i uproszczone: korony drzew mają jeden kształt, dopasowany do zmierzonej wysokości i szerokości, a budynki stoją na terenie z mapy do celów projektowych. Zapisane w pliku `surroundings.glb`.
+- **Mapa Google 3D (do wyboru przełącznikiem):** Google Photorealistic 3D Tiles przez Cesium ion, pobierana na żywo. Ta strona nie przechowuje żadnych danych tej mapy.
+- **Mapa Geoportal (domyślna):** ortofotomapa GUGiK z 2025 r., pobierana na żywo z geoportal.gov.pl, oraz modele 3D budynków (LoD1, 2024) i drzew (LoD1, 2023) GUGiK. Modele są przycięte do około 800 m od działki i uproszczone: korony drzew mają jeden kształt, dopasowany do zmierzonej wysokości i szerokości, a budynki stoją na terenie z mapy do celów projektowych. Zapisane w pliku `surroundings.glb`.
 
 ## Dokładność
 
@@ -27,6 +27,8 @@ To nieoficjalna wizualizacja poglądowa, a nie dokument projektowy.
 ## Znane ograniczenia
 
 - Mapa jest wycięta pod projektowanymi nawierzchniami, razem z fragmentami koron drzew nad nimi. Pozostałe drzewa zostają, bo projekt nie mówi, które będą usunięte.
+- „Pokaż projekt” chowa tylko projekt: tężnia z nawierzchnią i młode drzewa wzdłuż ścieżki już są, więc zostają.
+- Okna są nieprzezroczyste, bo wnętrze budynku nie jest modelowane.
 - Ciemne plamy na zdjęciach mapy to cienie z dnia nalotu. Nie zmieniają się z godziną.
 - Mapa Google nie jest aktualna: nie ma na niej m.in. istniejącej tężni ani nowego osiedla po drugiej stronie Terespolskiej.
 - Mapa jest wczytywana tylko do około 800 m od działki, żeby strona działała płynnie. Dalej widać jednolite tło.

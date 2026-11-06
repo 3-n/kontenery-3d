@@ -365,6 +365,7 @@ const timeInput = document.getElementById("time");
 const timeLabel = document.getElementById("time-label");
 const sunNote = document.getElementById("sun-note");
 const dateButtons = document.querySelectorAll("#dates button");
+const sunSummary = document.getElementById("sun-summary"); // what the folded section is set to
 
 // UTC offset in minutes of Warsaw time on a given calendar day (handles summer time).
 function warsawOffsetMinutes(utcGuess) {
@@ -384,7 +385,12 @@ function applyTime() {
   const mm = String(minutes % 60).padStart(2, "0");
   timeLabel.textContent = `${hh}:${mm}`;
   sunNote.hidden = sunIsUp(viewer.clock.currentTime);
-  for (const b of dateButtons) b.classList.toggle("active", dateInput.value.endsWith(b.dataset.date));
+  let preset = null;
+  for (const b of dateButtons) {
+    b.classList.toggle("active", dateInput.value.endsWith(b.dataset.date));
+    if (dateInput.value.endsWith(b.dataset.date)) preset = b.textContent.toLowerCase();
+  }
+  sunSummary.textContent = `${preset ?? `${day}.${String(month).padStart(2, "0")}`}, ${hh}:${mm}`;
   scene.requestRender();
 }
 
@@ -398,8 +404,9 @@ function sunIsUp(time) {
 }
 
 const year = new Date().getFullYear();
-dateInput.value = `${year}-${/^\d\d-\d\d$/.test(switchState?.date) ? switchState.date : "03-20"}`;
-timeInput.value = Number.isFinite(switchState?.time) ? switchState.time : 12 * 60;
+// Summer solstice at 15:00 (Jarek's choice, 2026-11-06), unless the map switch carried a setting over.
+dateInput.value = `${year}-${/^\d\d-\d\d$/.test(switchState?.date) ? switchState.date : "06-21"}`;
+timeInput.value = Number.isFinite(switchState?.time) ? switchState.time : 15 * 60;
 for (const b of dateButtons) {
   b.addEventListener("click", () => {
     dateInput.value = `${year}-${b.dataset.date}`;
@@ -432,6 +439,10 @@ function mapLimitPlanes(tileset) {
   });
 }
 
+// The Google map's cuts under the project's surfaces, which "Pokaż projekt" adds and removes. The cuts under the tężnia's
+// paving stay: the tężnia is already there, and the map is older.
+const projectCuts = [];
+
 async function loadGoogleTiles() {
   const tileset = await Cesium.createGooglePhotorealistic3DTileset(
     { onlyUsingWithGoogleGeocoder: true },
@@ -450,13 +461,14 @@ async function loadGoogleTiles() {
   // culled back faces would show a black void; drawing them shows the inside of the crown instead.
   tileset.backFaceCulling = false;
 
-  // Cut the old mesh where the project stands. The polygons lie on the ellipsoid, so the height doesn't affect them.
+  // Cut the old mesh where the model's surfaces stand. The polygons lie on the ellipsoid, so the height doesn't affect them.
   if (clippingSupported && site.clipPolygons.length > 0) {
-    tileset.clippingPolygons = new Cesium.ClippingPolygonCollection({
-      polygons: site.clipPolygons.map(
-        (c) => new Cesium.ClippingPolygon({ positions: c.polygon.map(([x, y]) => localToWorld(modelMatrix, x, y, 0)) }),
-      ),
+    const cuts = site.clipPolygons.map((c) => {
+      const cut = new Cesium.ClippingPolygon({ positions: c.polygon.map(([x, y]) => localToWorld(modelMatrix, x, y, 0)) });
+      if (!c.existing) projectCuts.push(cut);
+      return cut;
     });
+    tileset.clippingPolygons = new Cesium.ClippingPolygonCollection({ polygons: cuts });
   }
   tileset.clippingPlanes = mapLimitPlanes(tileset);
   scene.primitives.add(tileset);
@@ -513,21 +525,32 @@ const surroundingsReady = useGoogle ? Promise.resolve() : whenReady(surroundings
 
 // --- before and after ------------------------------------------------------------------------
 const projectBox = document.getElementById("project");
-// On the Geoportal map, GUGiK's trees where the project paves or builds. They show only without the project, as the
-// Google map's own trees do when its cut is lifted.
-const showProjectSiteTrees = (show) => {
-  if (!surroundings?.ready) return;
-  for (const part of ["crowns", "trunks"]) {
-    const node = surroundings.getNode(`Project-site tree ${part}`);
-    if (node) node.show = show;
+// What "Pokaż projekt" hides: the model's groups from blender/build.py, whose names scripts/check_model.py checks. Not
+// "Existing", the tężnia and its paving, which are already there, nor "Backing", which belongs to the Google map.
+const PROJECT_NODES = ["Building", "Site", "Furniture", "Trees"];
+
+function showProject(show) {
+  if (model.ready) for (const name of PROJECT_NODES) model.getNode(name).show = show;
+  const cuts = tileset?.clippingPolygons;
+  if (cuts) {
+    for (const cut of projectCuts) {
+      if (show && !cuts.contains(cut)) cuts.add(cut);
+      if (!show && cuts.contains(cut)) cuts.remove(cut);
+    }
   }
-};
-surroundingsReady.then(() => showProjectSiteTrees(!projectBox.checked));
-projectBox.addEventListener("change", (event) => {
-  model.show = event.target.checked;
-  if (tileset?.clippingPolygons) tileset.clippingPolygons.enabled = event.target.checked;
-  showProjectSiteTrees(!event.target.checked);
-});
+  // On the Geoportal map, GUGiK's trees where the project paves or builds come back, as the Google map's own trees do
+  // when its cut is lifted.
+  if (surroundings?.ready) {
+    for (const part of ["crowns", "trunks"]) {
+      const node = surroundings.getNode(`Project-site tree ${part}`);
+      if (node) node.show = !show;
+    }
+  }
+}
+// Nodes can only be reached once each model is ready, and the switch may have asked for the project hidden before that.
+whenReady(model).then(() => showProject(projectBox.checked));
+surroundingsReady.then(() => showProject(projectBox.checked));
+projectBox.addEventListener("change", (event) => showProject(event.target.checked));
 if (switchState?.project === false) {
   projectBox.checked = false;
   projectBox.dispatchEvent(new Event("change"));

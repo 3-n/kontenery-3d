@@ -173,6 +173,7 @@
  "clipPolygons": [
   {
    "id": "paving",
+   "existing": false,
    "polygon": [
     [
      -11.75,
@@ -250,6 +251,7 @@
   },
   {
    "id": "tezni_ring",
+   "existing": true,
    "polygon": [
     [
      -6.17,
@@ -383,6 +385,7 @@
   },
   {
    "id": "tezni_path",
+   "existing": true,
    "polygon": [
     [
      -17.56,
@@ -412,6 +415,7 @@
   },
   {
    "id": "deck",
+   "existing": false,
    "polygon": [
     [
      7.78,
