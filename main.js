@@ -360,18 +360,18 @@ for (const button of document.querySelectorAll("#maps button")) {
 document.getElementById(`map-note-${contextName}`).hidden = false;
 
 // When the Google map fails, say with a rejected token or after too many loads too quickly, offer the Geoportal map,
-// which needs neither. The message itself comes from the handler in index.html, which runs first and replaces the
-// status text, button included, on each error.
+// which needs neither. For a failure to open the map, the message comes from the handler in index.html, which runs first
+// and replaces the status text, button included, on each error. For tiles refused later, see reportRefusedTiles.
+let mapFailed = false; // keeps the message up once the loading message would otherwise be cleared
+function offerGeoportal() {
+  const button = document.createElement("button");
+  button.id = "fallback-map";
+  button.textContent = "Otwórz mapę Geoportal";
+  button.addEventListener("click", () => switchMap("geoportal"));
+  statusEl.append(" ", button);
+}
 if (useGoogle) {
-  for (const type of ["error", "unhandledrejection"]) {
-    addEventListener(type, () => {
-      const button = document.createElement("button");
-      button.id = "fallback-map";
-      button.textContent = "Otwórz mapę Geoportal";
-      button.addEventListener("click", () => switchMap("geoportal"));
-      statusEl.append(" ", button);
-    });
-  }
+  for (const type of ["error", "unhandledrejection"]) addEventListener(type, offerGeoportal);
 }
 
 // --- date and time ------------------------------------------------------------------------
@@ -539,11 +539,30 @@ const [model, surroundings, tileset] = await Promise.all([
   useGoogle ? openGoogleTiles() : null,
 ]);
 if (tileset) {
+  reportRefusedTiles(tileset);
   scene.primitives.add(tileset);
   performance.mark("map opened");
 }
 const whenReady = (m) => new Promise((resolve) => (m.ready ? resolve() : m.readyEvent.addEventListener(() => resolve())));
 const surroundingsReady = useGoogle ? Promise.resolve() : whenReady(surroundings);
+
+// Tiles refused after the map opened, say once a quota runs out: Cesium only logs them, so the page would just stay
+// empty. A refusal turns away nearly every tile, while a patchy connection loses a few among many, so it takes 3 failures
+// and more failures than loaded tiles.
+function reportRefusedTiles(tileset) {
+  let loadedTiles = 0;
+  let failedTiles = 0;
+  tileset.tileLoad.addEventListener(() => loadedTiles++);
+  tileset.tileFailed.addEventListener(({ message }) => {
+    failedTiles++;
+    if (mapFailed || failedTiles < 3 || failedTiles <= loadedTiles) return;
+    mapFailed = true;
+    // Cesium's message can end "Status Code: 429", but for tiles it's usually just "Request has failed."
+    const code = String(message).match(/Status Code: (\d+)/)?.[1];
+    setStatus(`Nie udało się wczytać mapy Google: serwer mapy ${code ? `odpowiedział kodem ${code}` : "odrzuca zapytania"}.`);
+    offerGeoportal();
+  });
+}
 
 // --- before and after ------------------------------------------------------------------------
 const projectBox = document.getElementById("project");
@@ -657,7 +676,9 @@ const mapShown = Promise.race([loaded, new Promise((resolve) => setTimeout(resol
 // The blurred map still needs explaining until it's sharp. Not for ever, though: once in about six test runs the signal
 // for "sharp" never came, and the message then sat over a working map.
 const LOADING_MESSAGE_AT_MOST_MS = 30000;
-Promise.race([mapSettled, mapShown.then(() => new Promise((resolve) => setTimeout(resolve, LOADING_MESSAGE_AT_MOST_MS)))]).then(() => setStatus(""));
+Promise.race([mapSettled, mapShown.then(() => new Promise((resolve) => setTimeout(resolve, LOADING_MESSAGE_AT_MOST_MS)))]).then(() => {
+  if (!mapFailed) setStatus("");
+});
 
 // --- measure the ground ------------------------------------------------------------------------
 // Anchor the model's height on the map: take the median of (map height - expected local z) over

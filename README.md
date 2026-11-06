@@ -29,6 +29,7 @@ To nieoficjalna wizualizacja poglądowa, a nie dokument projektowy.
 - Mapa jest wycięta pod projektowanymi nawierzchniami, razem z fragmentami koron drzew nad nimi. Pozostałe drzewa zostają, bo projekt nie mówi, które będą usunięte.
 - „Pokaż projekt” chowa tylko projekt: tężnia z nawierzchnią i młode drzewa wzdłuż ścieżki już są, więc zostają.
 - Okna są nieprzezroczyste, bo wnętrze budynku nie jest modelowane.
+- Zjazd na ul. Terespolską leży poza działką i nie należy do projektu (na planie jest opisany jako „w realizacji”), dlatego jest półprzezroczysty. Na mapie Google z bliska miejscami przebija przez niego trawnik.
 - Ciemne plamy na zdjęciach mapy to cienie z dnia nalotu. Nie zmieniają się z godziną.
 - Mapa Google nie jest aktualna: nie ma na niej m.in. istniejącej tężni ani nowego osiedla po drugiej stronie Terespolskiej.
 - Mapa jest wczytywana tylko do około 800 m od działki, żeby strona działała płynnie. Dalej widać jednolite tło.
