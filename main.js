@@ -1028,30 +1028,107 @@ const mapEl = document.getElementById("map");
 const toPoint = new Cesium.Cartesian3();
 function onScreen(local) {
   const world = localToWorld(modelMatrix, ...local);
-  if (Cesium.Cartesian3.dot(Cesium.Cartesian3.subtract(world, camera.positionWC, toPoint), camera.directionWC) <= 0) return undefined;
+  const depth = Cesium.Cartesian3.dot(Cesium.Cartesian3.subtract(world, camera.positionWC, toPoint), camera.directionWC);
+  if (depth <= 0) return undefined;
   const xy = Cesium.SceneTransforms.worldToWindowCoordinates(scene, world);
-  return xy && { x: xy.x, y: xy.y, distance: Cesium.Cartesian3.magnitude(toPoint) };
+  return xy && { x: xy.x, y: xy.y, depth, distance: Cesium.Cartesian3.magnitude(toPoint) };
 }
-scene.postRender.addEventListener(() => {
+
+// Heads too close on screen spread apart, and their lines lean out to them from the objects' feet, still in the scene,
+// so objects still hide them. A head's spread is in screen pixels; its line's top moves by as much across the view, at
+// the pin's own depth, which projects to just where the head is. Each frame starts from the last spread, drawn back a
+// little, so crowded heads settle just clear of each other and follow the camera smoothly, and lone ones go back over
+// their objects.
+const HEAD_PX = isTouch ? 34 : 28; // as in style.css
+const SPREAD_GAP_PX = 4;
+const SPREAD_MAX_PX = 90;
+const SPREAD_RETURN = 0.85; // of the last frame's spread
+function spreadHeads(shown) {
+  const reach = HEAD_PX + SPREAD_GAP_PX;
+  for (const m of shown) {
+    m.spread.x *= SPREAD_RETURN;
+    m.spread.y *= SPREAD_RETURN;
+  }
+  for (let round = 0; round < 10; round++) {
+    let moved = false;
+    for (let i = 0; i < shown.length; i++) {
+      for (let j = i + 1; j < shown.length; j++) {
+        const [a, b] = [shown[i], shown[j]];
+        let dx = b.anchor.x + b.spread.x - (a.anchor.x + a.spread.x);
+        let dy = b.anchor.y + b.spread.y - (a.anchor.y + a.spread.y);
+        let d = Math.hypot(dx, dy);
+        if (d >= reach) continue;
+        if (d < 0.01) [dx, dy, d] = [Math.cos(a.index + b.index), Math.sin(a.index + b.index), 1]; // one over the other: any way
+        const push = (reach - d) / 2 / d; // half each, along the line between them
+        a.spread.x -= dx * push;
+        a.spread.y -= dy * push;
+        b.spread.x += dx * push;
+        b.spread.y += dy * push;
+        moved = true;
+      }
+    }
+    if (!moved) break;
+  }
+  for (const m of shown) {
+    const length = Math.hypot(m.spread.x, m.spread.y);
+    if (length > SPREAD_MAX_PX) [m.spread.x, m.spread.y] = [(m.spread.x * SPREAD_MAX_PX) / length, (m.spread.y * SPREAD_MAX_PX) / length];
+  }
+}
+
+const pixelSize = new Cesium.Cartesian2();
+const leanWorld = new Cesium.Cartesian3();
+const leanUp = new Cesium.Cartesian3();
+const leanLocal = new Cesium.Cartesian3();
+const worldToLocal = new Cesium.Matrix4();
+function leanStem(m) {
+  if (Math.hypot(m.spread.x, m.spread.y) < 0.5) {
+    if (m.leaning) m.stem.positions = [m.pinLocal, m.footLocal];
+    m.leaning = false;
+    return;
+  }
+  camera.frustum.getPixelDimensions(scene.drawingBufferWidth, scene.drawingBufferHeight, m.anchor.depth, scene.pixelRatio, pixelSize);
+  Cesium.Cartesian3.multiplyByScalar(camera.rightWC, m.spread.x * pixelSize.x, leanWorld);
+  Cesium.Cartesian3.add(leanWorld, Cesium.Cartesian3.multiplyByScalar(camera.upWC, -m.spread.y * pixelSize.y, leanUp), leanWorld);
+  Cesium.Matrix4.multiplyByPointAsVector(worldToLocal, leanWorld, leanLocal);
+  m.stem.positions = [Cesium.Cartesian3.add(m.pinLocal, leanLocal, new Cesium.Cartesian3()), m.footLocal];
+  m.leaning = true;
+}
+for (const m of markers) {
+  m.spread = { x: 0, y: 0 };
+  m.pinLocal = new Cesium.Cartesian3(...m.pin);
+  m.footLocal = new Cesium.Cartesian3(...m.foot);
+}
+
+// Before each frame is drawn, with the camera already moved for it, so the leaning lines and the heads agree.
+scene.preRender.addEventListener(() => {
   const loading = mapEl.classList.contains("loading");
   const { clientWidth: w, clientHeight: h } = scene.canvas;
   // On the Google map the model is lifted once the ground's height is measured, and the lines with it.
   if (!Cesium.Matrix4.equals(stems.modelMatrix, modelMatrix)) Cesium.Matrix4.clone(modelMatrix, stems.modelMatrix);
+  Cesium.Matrix4.inverseTransformation(modelMatrix, worldToLocal);
   const shown = [];
   for (const m of markers) {
-    const top = !loading && pinShown(m) ? onScreen(m.pin) : undefined;
-    const show = Boolean(top) && top.x >= 0 && top.y >= 0 && top.x <= w && top.y <= h;
+    const anchor = !loading && pinShown(m) ? onScreen(m.pin) : undefined;
+    const show = Boolean(anchor) && anchor.x >= 0 && anchor.y >= 0 && anchor.x <= w && anchor.y <= h;
     if (m.head.hidden === show) m.head.hidden = !show;
     m.stem.show = show; // a line only under a head
-    if (!show) continue;
-    m.head.style.transform = `translate(${top.x.toFixed(1)}px, ${top.y.toFixed(1)}px) translate(-50%, -100%)`;
-    m.top = top;
-    shown.push([m, top.distance]);
+    if (!show) {
+      m.spread.x = m.spread.y = 0;
+      continue;
+    }
+    m.anchor = anchor;
+    shown.push(m);
+  }
+  spreadHeads(shown);
+  for (const m of shown) {
+    m.top = { x: m.anchor.x + m.spread.x, y: m.anchor.y + m.spread.y, distance: m.anchor.distance };
+    m.head.style.transform = `translate(${m.top.x.toFixed(1)}px, ${m.top.y.toFixed(1)}px) translate(-50%, -100%)`;
+    leanStem(m);
   }
   // Nearer heads over farther ones.
-  shown.sort((a, b) => b[1] - a[1]).forEach(([m], rank) => (m.head.style.zIndex = String(rank + 1)));
-  testBehind();
+  shown.sort((a, b) => b.top.distance - a.top.distance).forEach((m, rank) => (m.head.style.zIndex = String(rank + 1)));
 });
+scene.postRender.addEventListener(() => testBehind());
 
 // A head that something stands in front of, a tree say, turns grey and faint, as the line under it is hidden: the
 // nearest surface in the frame just drawn, at the head's middle, is nearer than the pin. A depth read stalls the GPU a
