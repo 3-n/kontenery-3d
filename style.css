@@ -40,6 +40,12 @@ button {
 }
 button:hover { background: #eef1f4; }
 button.active { background: #24313c; border-color: #24313c; color: #fff; }
+button:disabled { color: #a3a9ae; cursor: default; }
+button:disabled:hover { background: #fff; }
+
+/* Back to the default date and time: an arrow turning back, faint while they're already set. */
+#sun-reset { display: inline-flex; align-items: center; padding: 0 7px; }
+#sun-reset svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
 
 .row { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
 input[type="date"] { font: inherit; padding: 2px 4px; }

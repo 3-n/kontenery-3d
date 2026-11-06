@@ -524,7 +524,11 @@ const dateInput = document.getElementById("date");
 const timeInput = document.getElementById("time");
 const timeLabel = document.getElementById("time-label");
 const sunNote = document.getElementById("sun-note");
-const dateButtons = document.querySelectorAll("#dates button");
+const dateButtons = document.querySelectorAll("#dates button[data-date]");
+const sunReset = document.getElementById("sun-reset");
+// Summer solstice at 15:00 (Jarek's choice, 2026-11-06). The reset button goes back to them.
+const DEFAULT_DATE = "06-21";
+const DEFAULT_TIME = 15 * 60;
 const sunSummary = document.getElementById("sun-summary"); // what the folded section is set to
 
 // UTC offset in minutes of Warsaw time on a given calendar day (handles summer time).
@@ -551,6 +555,7 @@ function applyTime() {
     if (dateInput.value.endsWith(b.dataset.date)) preset = b.textContent.toLowerCase();
   }
   sunSummary.textContent = `${preset ?? `${day}.${String(month).padStart(2, "0")}`}, ${hh}:${mm}`;
+  sunReset.disabled = dateInput.value.endsWith(DEFAULT_DATE) && minutes === DEFAULT_TIME;
   scene.requestRender();
 }
 
@@ -564,15 +569,20 @@ function sunIsUp(time) {
 }
 
 const year = new Date().getFullYear();
-// Summer solstice at 15:00 (Jarek's choice, 2026-11-06), unless the map switch carried a setting over.
-dateInput.value = `${year}-${/^\d\d-\d\d$/.test(switchState?.date) ? switchState.date : "06-21"}`;
-timeInput.value = Number.isFinite(switchState?.time) ? switchState.time : 15 * 60;
+// The defaults, unless the map switch carried a setting over.
+dateInput.value = `${year}-${/^\d\d-\d\d$/.test(switchState?.date) ? switchState.date : DEFAULT_DATE}`;
+timeInput.value = Number.isFinite(switchState?.time) ? switchState.time : DEFAULT_TIME;
 for (const b of dateButtons) {
   b.addEventListener("click", () => {
     dateInput.value = `${year}-${b.dataset.date}`;
     applyTime();
   });
 }
+sunReset.addEventListener("click", () => {
+  dateInput.value = `${year}-${DEFAULT_DATE}`;
+  timeInput.value = DEFAULT_TIME;
+  applyTime();
+});
 dateInput.addEventListener("input", applyTime);
 timeInput.addEventListener("input", applyTime);
 applyTime();
