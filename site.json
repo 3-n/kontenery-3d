@@ -108,8 +108,8 @@
    "id": "across_terespolska",
    "label": "Z drugiej strony Terespolskiej (6 m)",
    "eye": [
-    -68,
-    66,
+    -66,
+    68.5,
     6.5
    ],
    "target": [
@@ -456,9 +456,6 @@
   "radius": 800,
   "sides": 4
  },
- "hiddenOsmBuildings": [
-  1446484926
- ],
  "groundSpots": [
   {
    "x": -22.0,

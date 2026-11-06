@@ -113,7 +113,8 @@ function plainHaze() {
 // a quick first layer and the WMS sharpens it, as the Google map does.
 const GEOPORTAL = "https://mapy.geoportal.gov.pl/wss/service/PZGIK/ORTO";
 const COARSE_PHOTO_LEVELS = 12;
-const ORTHOPHOTO_CREDIT = new Cesium.Credit("Ortofotomapa: GUGiK, geoportal.gov.pl", true); // Geoportal's terms: state the source
+// Geoportal's terms: state the source. One credit for the photo, buildings and trees, so it shows once.
+const GUGIK_CREDIT = new Cesium.Credit("Ortofotomapa, budynki i drzewa 3D: GUGiK, geoportal.gov.pl", true);
 let coarsePhotoLoaded; // resolves when the coarse photo has nothing left to fetch
 const coarsePhotoIdle = new Promise((resolve) => (coarsePhotoLoaded = resolve));
 
@@ -140,7 +141,7 @@ function orthophotos() {
     tileHeight: 512,
     rectangle,
     maximumLevel: COARSE_PHOTO_LEVELS,
-    credit: ORTHOPHOTO_CREDIT,
+    credit: GUGIK_CREDIT,
   });
   // Count what the coarse layer still has in flight, so the map can be shown as soon as it's all there. Not after the
   // first few tiles: those are the broad overview levels, fetched before the detailed ones are even asked for.
@@ -164,7 +165,7 @@ function orthophotos() {
     minimumLevel: COARSE_PHOTO_LEVELS + 1,
     maximumLevel: 21,
     enablePickFeatures: false,
-    credit: ORTHOPHOTO_CREDIT,
+    credit: GUGIK_CREDIT,
   });
   return [coarse, fine];
 }
@@ -431,22 +432,20 @@ function mapLimitPlanes(tileset) {
   });
 }
 
-async function loadMap() {
-  const tileset = useGoogle
-    ? await Cesium.createGooglePhotorealistic3DTileset(
-        { onlyUsingWithGoogleGeocoder: true },
-        {
-          maximumScreenSpaceError: isSmallScreen ? 24 : 16,
-          // On by default for these tiles. Before detail loads it reads heights off the coarse mesh and lifts a
-          // street-level camera to about 20 m, for good. Without it you can zoom through the ground, but the view
-          // buttons bring you back.
-          enableCollision: false,
-          // Go straight to the tiles this view needs, without every coarser level on the way down. On a phone on 4G
-          // this halves the download and the time until the map is sharp, and the final picture is the same.
-          skipLevelOfDetail: true,
-        },
-      )
-    : await Cesium.createOsmBuildingsAsync();
+async function loadGoogleTiles() {
+  const tileset = await Cesium.createGooglePhotorealistic3DTileset(
+    { onlyUsingWithGoogleGeocoder: true },
+    {
+      maximumScreenSpaceError: isSmallScreen ? 24 : 16,
+      // On by default for these tiles. Before detail loads it reads heights off the coarse mesh and lifts a
+      // street-level camera to about 20 m, for good. Without it you can zoom through the ground, but the view
+      // buttons bring you back.
+      enableCollision: false,
+      // Go straight to the tiles this view needs, without every coarser level on the way down. On a phone on 4G
+      // this halves the download and the time until the map is sharp, and the final picture is the same.
+      skipLevelOfDetail: true,
+    },
+  );
   // Photogrammetry trees are hollow shells with no ground inside. Where the clipping below cuts one open,
   // culled back faces would show a black void; drawing them shows the inside of the crown instead.
   tileset.backFaceCulling = false;
@@ -460,13 +459,30 @@ async function loadMap() {
     });
   }
   tileset.clippingPlanes = mapLimitPlanes(tileset);
-  if (!useGoogle && site.hiddenOsmBuildings.length > 0) {
-    // Buildings OSM has where the model stands.
-    tileset.style = new Cesium.Cesium3DTileStyle({ show: site.hiddenOsmBuildings.map((id) => `\${elementId} !== ${id}`).join(" && ") });
-  }
   scene.primitives.add(tileset);
   performance.mark("map opened");
   return tileset;
+}
+
+// The Geoportal map's buildings and trees: GUGiK's, already cut to the map limit and clear of the model, standing on the
+// same surveyed ground (scripts/gugik_surroundings.py). One small file, in the model's frame.
+async function loadSurroundings() {
+  const surroundings = await Cesium.Model.fromGltfAsync({
+    url: "./surroundings.glb",
+    modelMatrix,
+    upAxis: Cesium.Axis.Y,
+    forwardAxis: Cesium.Axis.X,
+    // Their shadows fall on the ground and the model, which is what the sun study needs. Receiving them too speckled
+    // the long flat walls lit at a low angle, and walls facing away from the sun are already darker by their shading.
+    shadows: Cesium.ShadowMode.CAST_ONLY,
+    credit: GUGIK_CREDIT,
+  });
+  // Lit like the model, so shaded walls don't go black against the unlit photo.
+  surroundings.environmentMapManager.brightness = config.modelAmbientBrightness;
+  surroundings.environmentMapManager.saturation = 0.4;
+  scene.primitives.add(surroundings);
+  performance.mark("map opened");
+  return surroundings;
 }
 
 // --- the model ----------------------------------------------------------------------------
@@ -489,14 +505,28 @@ async function loadModel() {
 }
 
 // The model first. It's a small file, but it would otherwise wait behind hundreds of map tiles: about 10 s on 4G.
-const model = await loadModel();
-const tileset = await loadMap();
+// The Geoportal map's buildings and trees are a single small file, so they can come alongside.
+const [model, surroundings] = await Promise.all([loadModel(), useGoogle ? null : loadSurroundings()]);
+const tileset = useGoogle ? await loadGoogleTiles() : null;
+const whenReady = (m) => new Promise((resolve) => (m.ready ? resolve() : m.readyEvent.addEventListener(() => resolve())));
+const surroundingsReady = useGoogle ? Promise.resolve() : whenReady(surroundings);
 
 // --- before and after ------------------------------------------------------------------------
 const projectBox = document.getElementById("project");
+// On the Geoportal map, GUGiK's trees where the project paves or builds. They show only without the project, as the
+// Google map's own trees do when its cut is lifted.
+const showProjectSiteTrees = (show) => {
+  if (!surroundings?.ready) return;
+  for (const part of ["crowns", "trunks"]) {
+    const node = surroundings.getNode(`Project-site tree ${part}`);
+    if (node) node.show = show;
+  }
+};
+surroundingsReady.then(() => showProjectSiteTrees(!projectBox.checked));
 projectBox.addEventListener("change", (event) => {
   model.show = event.target.checked;
-  if (tileset.clippingPolygons) tileset.clippingPolygons.enabled = event.target.checked;
+  if (tileset?.clippingPolygons) tileset.clippingPolygons.enabled = event.target.checked;
+  showProjectSiteTrees(!event.target.checked);
 });
 if (switchState?.project === false) {
   projectBox.checked = false;
@@ -541,7 +571,8 @@ const DETAILED_TILE_ERROR_M = 100; // on the Google map, a tile this fine means 
 const SHOW_ANYWAY_MS = 20000; // on a slow connection, a partly loaded map beats an empty page
 
 const mapHasDetail = new Promise((resolve) => {
-  if (!useGoogle) return coarsePhotoIdle.then(resolve); // the quick, coarse aerial photo is all there
+  // On the Geoportal map: the quick, coarse aerial photo is all there, and so are the buildings.
+  if (!useGoogle) return Promise.all([coarsePhotoIdle, surroundingsReady]).then(resolve);
   const stop = tileset.tileVisible.addEventListener((tile) => {
     if (tile.geometricError <= DETAILED_TILE_ERROR_M) {
       stop();
@@ -549,7 +580,7 @@ const mapHasDetail = new Promise((resolve) => {
     }
   });
 });
-const tilesSettled = new Promise((resolve) => tileset.initialTilesLoaded.addEventListener(() => resolve()));
+const tilesSettled = useGoogle ? new Promise((resolve) => tileset.initialTilesLoaded.addEventListener(() => resolve())) : surroundingsReady;
 // On the Geoportal map, also the sharp photo and the ground for this view.
 // Checked every frame: the globe's progress event can report an empty queue a frame before tilesLoaded agrees, and then
 // stays silent.
@@ -563,7 +594,7 @@ const globeSettled = new Promise((resolve) => {
   });
 });
 const mapSettled = Promise.all([tilesSettled, globeSettled]);
-const modelReady = new Promise((resolve) => (model.ready ? resolve() : model.readyEvent.addEventListener(() => resolve())));
+const modelReady = whenReady(model);
 mapHasDetail.then(() => performance.mark("map has detail"));
 modelReady.then(() => {
   performance.mark("model ready");
@@ -623,6 +654,7 @@ const heightSettled = mapShown.then(async () => {
 window.app = {
   viewer,
   tileset,
+  surroundings,
   model,
   get modelMatrix() {
     return modelMatrix;
