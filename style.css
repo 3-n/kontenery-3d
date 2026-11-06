@@ -121,7 +121,9 @@ output { font-variant-numeric: tabular-nums; font-weight: 600; }
 #status[hidden] { display: none; }
 /* The loading bar under "Wczytywanie mapy…": main.js raises --progress. Registered, so the bar glides between steps. */
 @property --progress { syntax: "<percentage>"; inherits: true; initial-value: 0%; }
-#status.progress { min-width: 220px; font-variant-numeric: tabular-nums; transition: --progress 0.4s ease-out; }
+/* Drags and the wheel pass through it to the map: it sits over the bottom of the view until the map is sharp. Error
+   messages keep them, for the button one carries. */
+#status.progress { min-width: 220px; font-variant-numeric: tabular-nums; transition: --progress 0.4s ease-out; pointer-events: none; }
 #status.progress::after {
   content: "";
   display: block;
