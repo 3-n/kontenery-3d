@@ -24,6 +24,9 @@ const [site, siteTrees] = await Promise.all([
 ]);
 const statusEl = document.getElementById("status");
 const setStatus = (text) => {
+  // Any other message, or none, ends the loading bar (see "loading progress").
+  statusEl.classList.remove("progress");
+  statusEl.removeAttribute("aria-busy");
   statusEl.textContent = text || "";
   statusEl.hidden = !text;
 };
@@ -196,6 +199,43 @@ const viewer = new Cesium.Viewer("map", {
   terrainProvider: useGoogle ? undefined : surveyedGround(),
 });
 const { scene, camera } = viewer;
+
+// --- loading progress ----------------------------------------------------------------------
+// "Wczytywanie mapy…" shows a bar and a percentage. Cesium can't know how many tiles a view needs until it has asked for
+// them, so the map's share is an estimate: tiles loaded, out of the most there have been loaded and waiting at once.
+// Not out of those waiting now: the queue shrinks for a moment before each round of requests, and the bar then shot
+// to half and stalled. Measured on the Geoportal map's overview, throttled: the total reaches its final 173 tiles
+// within a second of the first. It never goes back, and it only reaches 100% once the map is sharp. The model and, on the Geoportal map, the buildings and trees are
+// one file each, counted as steps. index.html starts the bar at 0%, before Cesium has even downloaded.
+const LOAD_WEIGHTS = useGoogle ? { model: 1, map: 6 } : { model: 1, surroundings: 1, map: 6 };
+const MAP_SHARE_BEFORE_SHARP = 0.97;
+const loadShares = Object.fromEntries(Object.keys(LOAD_WEIGHTS).map((part) => [part, 0]));
+let loadPercent = 0;
+function showProgress(part, share) {
+  loadShares[part] = Math.max(loadShares[part], Math.min(share, 1));
+  // Once an error, or the end of loading, has replaced the message, there's nothing to update.
+  if (!statusEl.classList.contains("progress")) return;
+  const weights = Object.entries(LOAD_WEIGHTS);
+  const total = weights.reduce((sum, [, weight]) => sum + weight, 0);
+  const percent = Math.floor((100 * weights.reduce((sum, [name, weight]) => sum + weight * loadShares[name], 0)) / total);
+  if (percent <= loadPercent) return;
+  loadPercent = percent;
+  statusEl.textContent = `Wczytywanie mapy… ${percent}%`;
+  statusEl.style.setProperty("--progress", `${percent}%`);
+}
+// The Geoportal map's globe only reports how long its queue of terrain and photo tiles is, so a shorter queue counts
+// as that many tiles loaded.
+if (!useGoogle) {
+  let loadedTiles = 0;
+  let waitingTiles = 0;
+  let mostTiles = 0;
+  scene.globe.tileLoadProgressEvent.addEventListener((queued) => {
+    if (queued < waitingTiles) loadedTiles += waitingTiles - queued;
+    waitingTiles = queued;
+    mostTiles = Math.max(mostTiles, loadedTiles + queued);
+    if (mostTiles > 0) showProgress("map", Math.min(MAP_SHARE_BEFORE_SHARP, loadedTiles / mostTiles));
+  });
+}
 
 Object.assign(viewer.shadowMap, {
   softShadows: true,
@@ -809,6 +849,7 @@ async function loadSurroundings() {
   surroundings.environmentMapManager.saturation = 0.4;
   scene.primitives.add(surroundings);
   performance.mark("map opened");
+  showProgress("surroundings", 1);
   return surroundings;
 }
 
@@ -829,6 +870,7 @@ async function loadModel() {
   model.environmentMapManager.saturation = 0.4;
   scene.primitives.add(model);
   performance.mark("model file read");
+  showProgress("model", 1);
   return model;
 }
 
@@ -844,6 +886,16 @@ if (tileset) {
   reportRefusedTiles(tileset);
   scene.primitives.add(tileset);
   performance.mark("map opened");
+  // The Google tileset reports both: tiles loaded, and requests still pending or being processed. It asks for finer
+  // tiles only as coarser ones arrive, so the total grows for seconds and the bar ran to 78% at once and then waited.
+  // So it counts on at least about as many as the first view takes: 60 tiles on a phone and 106 on a desktop, measured.
+  let loadedTiles = 0;
+  let mostTiles = isSmallScreen ? 50 : 90;
+  tileset.tileLoad.addEventListener(() => loadedTiles++);
+  tileset.loadProgress.addEventListener((pending, processing) => {
+    mostTiles = Math.max(mostTiles, loadedTiles + pending + processing);
+    if (mostTiles > 0) showProgress("map", Math.min(MAP_SHARE_BEFORE_SHARP, loadedTiles / mostTiles));
+  });
 }
 const whenReady = (m) => new Promise((resolve) => (m.ready ? resolve() : m.readyEvent.addEventListener(() => resolve())));
 const surroundingsReady = useGoogle ? Promise.resolve() : whenReady(surroundings);
@@ -1238,7 +1290,13 @@ const mapShown = Promise.race([loaded, new Promise((resolve) => setTimeout(resol
 // The blurred map still needs explaining until it's sharp. Not for ever, though: once in about six test runs the signal
 // for "sharp" never came, and the message then sat over a working map.
 const LOADING_MESSAGE_AT_MOST_MS = 30000;
-Promise.race([mapSettled, mapShown.then(() => new Promise((resolve) => setTimeout(resolve, LOADING_MESSAGE_AT_MOST_MS)))]).then(() => {
+// A full bar, briefly, so it doesn't vanish at 90-something per cent.
+const FULL_BAR_MS = 400;
+mapSettled.then(() => showProgress("map", 1));
+Promise.race([
+  mapSettled.then(() => new Promise((resolve) => setTimeout(resolve, FULL_BAR_MS))),
+  mapShown.then(() => new Promise((resolve) => setTimeout(resolve, LOADING_MESSAGE_AT_MOST_MS))),
+]).then(() => {
   if (!mapFailed) setStatus("");
 });
 

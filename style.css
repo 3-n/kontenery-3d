@@ -119,6 +119,17 @@ output { font-variant-numeric: tabular-nums; font-weight: 600; }
   font-size: 13px;
 }
 #status[hidden] { display: none; }
+/* The loading bar under "Wczytywanie mapy…": main.js raises --progress. Registered, so the bar glides between steps. */
+@property --progress { syntax: "<percentage>"; inherits: true; initial-value: 0%; }
+#status.progress { min-width: 220px; font-variant-numeric: tabular-nums; transition: --progress 0.4s ease-out; }
+#status.progress::after {
+  content: "";
+  display: block;
+  height: 4px;
+  margin: 6px 0 2px;
+  border-radius: 2px;
+  background: linear-gradient(to right, #24313c var(--progress), #d5dbe0 var(--progress));
+}
 #status { max-width: calc(100% - 48px); box-sizing: border-box; text-align: center; }
 
 /* Back to the chosen view: shown by main.js once the camera has moved away from it. Above the credits. */

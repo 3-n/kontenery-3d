@@ -74,7 +74,8 @@
   <!-- After #info, so the phone layout can hide it while the popup is open: see style.css. -->
   <button id="reset-view" hidden>↺ Wróć do widoku</button>
 
-  <div id="status" role="status">Wczytywanie mapy…</div>
+  <!-- The bar under the message is drawn by style.css from --progress, which main.js raises as the map loads. -->
+  <div id="status" role="status" class="progress" aria-busy="true" style="--progress: 0%">Wczytywanie mapy…</div>
   <script>
     // Without this, a failed load (say, a rejected map token) would just say "loading" forever.
     for (const type of ["error", "unhandledrejection"]) {
@@ -83,6 +84,8 @@
         const error = event.reason ?? event.error;
         const code = error?.statusCode ? `serwer mapy odpowiedział kodem ${error.statusCode}` : null;
         const detail = error?.message ?? code ?? event.message ?? "nieznany błąd";
+        status.classList.remove("progress");
+        status.removeAttribute("aria-busy");
         status.textContent = `Nie udało się wczytać strony: ${detail}`;
         status.hidden = false;
       });
