@@ -59,9 +59,56 @@ output { font-variant-numeric: tabular-nums; font-weight: 600; }
 #about p { margin: 6px 0; }
 
 #info { top: 12px; right: 12px; width: 280px; padding: 10px 14px; box-sizing: border-box; }
-#info h3 { margin: 0 0 6px; font-size: 15px; }
+#info h3 { margin: 0 24px 6px 0; font-size: 15px; display: flex; gap: 7px; align-items: center; }
 #info ul { margin: 0; padding-left: 18px; }
+#info li + li { margin-top: 4px; }
+#info .hint[hidden] { display: none; }
 #info-close { position: absolute; top: 6px; right: 6px; border: 0; background: none; font-size: 18px; line-height: 1; padding: 2px 6px; }
+
+/* The marked places' pins, as on the site plan: a yellow head over the object with its number or an icon, or a swatch for
+   a surface. main.js places them each frame, and draws the line down from each in the scene. The layer keeps their
+   stacking under the panel and popups. */
+#pins { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+.pin-head, .pin-label {
+  box-sizing: border-box;
+  border: 2px solid #24313c;
+  border-radius: 50%;
+  background: #ffe14d;
+  color: #24313c;
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+}
+.pin-head {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  font-size: 15px;
+  pointer-events: auto;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.4);
+  transition: opacity 0.3s, filter 0.3s;
+}
+.pin-head:hover, .pin-head.lit { background: #24313c; color: #ffe14d; border-color: #ffe14d; }
+.pin-head[hidden] { display: none; }
+.pin-label { display: inline-block; flex: none; width: 22px; height: 22px; padding-top: 2px; font-size: 13px; }
+.pin-head svg, .pin-label svg, .swatch { display: block; width: 16px; height: 16px; margin: auto; }
+.pin-head svg, .pin-label svg { fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.pin-label.icon { display: inline-flex; padding: 0; }
+.pin-label svg, .pin-label .swatch { width: 14px; height: 14px; }
+/* As the legend draws them: the composite deck dark with fine boards, the mineral-resin paving sand-coloured. */
+.swatch { box-sizing: border-box; border: 1.5px solid #24313c; border-radius: 50%; }
+.swatch-deck { background: repeating-linear-gradient(90deg, #30353a 0 1.4px, #7d8388 1.4px 2.8px); }
+.swatch-paving { background: #d4b487 radial-gradient(circle, #8f6d43 0.7px, transparent 1px) 0 0 / 3.5px 3.5px; }
+.pin-head:hover .swatch, .pin-head.lit .swatch { border-color: #ffe14d; }
+/* Behind something in the scene: grey and faint, until pointed at. */
+.pin-head.behind:not(:hover):not(.lit) { opacity: 0.5; filter: grayscale(1); }
+@media (pointer: coarse) {
+  .pin-head { width: 34px; height: 34px; font-size: 17px; }
+  .pin-head svg, .pin-head .swatch { width: 20px; height: 20px; }
+}
 
 #status {
   bottom: 60px;

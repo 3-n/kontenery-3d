@@ -594,5 +594,1319 @@
    0,
    4.88
   ]
- }
+ },
+ "markers": [
+  {
+   "id": "tezni",
+   "label": "1",
+   "icon": null,
+   "title": "Tężnia solankowa",
+   "lines": [
+    {
+     "text": "Istniejąca: stoi tu już dziś."
+    }
+   ],
+   "note": "Odtworzona z obrysu na mapie do celów projektowych i ze zdjęcia, które pokazuje trzy z ośmiu ścian.",
+   "project": false,
+   "map": false,
+   "shapes": [
+    {
+     "type": "cylinder",
+     "xy": [
+      -10.62,
+      42.03
+     ],
+     "z": [
+      0.21,
+      4.47
+     ],
+     "radius": 4.96
+    }
+   ],
+   "pin": [
+    -10.62,
+    42.03,
+    5.97
+   ],
+   "lineEnd": null,
+   "strong": false
+  },
+  {
+   "id": "building",
+   "label": "2",
+   "icon": null,
+   "title": "Budynek usługowy",
+   "lines": [
+    {
+     "text": "Parter i antresola, taras na dachu parteru"
+    },
+    {
+     "text": "Wysokość: 5,92 m nad terenem"
+    },
+    {
+     "text": "Pomieszczenia łącznie 94 m², w tym pomieszczenie usługowe 43,6 m² i antresola 12,2 m²"
+    },
+    {
+     "text": "Kontenery stalowe, elewacja z blachy w kolorze grafitowym"
+    },
+    {
+     "text": "Toalety damska, męska i dla osób z niepełnosprawnościami"
+    }
+   ],
+   "note": null,
+   "project": true,
+   "map": false,
+   "shapes": [
+    {
+     "type": "prism",
+     "polygon": [
+      [
+       2.15,
+       16.74
+      ],
+      [
+       11.45,
+       -6.01
+      ],
+      [
+       6.74,
+       -7.93
+      ],
+      [
+       -2.56,
+       14.82
+      ]
+     ],
+     "z": [
+      0.28,
+      7.43
+     ]
+    }
+   ],
+   "pin": [
+    4.44,
+    4.41,
+    8.93
+   ],
+   "lineEnd": null,
+   "strong": false
+  },
+  {
+   "id": "parking",
+   "label": "3",
+   "icon": null,
+   "title": "Parking dla samochodów, 2 miejsca",
+   "lines": [
+    {
+     "text": "Dwa miejsca postojowe, każde 2,5 × 5 m."
+    }
+   ],
+   "note": "Linie na nawierzchni są w modelu przykładowe. Projekt podaje tylko wymiary miejsc.",
+   "project": true,
+   "map": false,
+   "shapes": [
+    {
+     "type": "prism",
+     "polygon": [
+      [
+       10.9,
+       -5.34
+      ],
+      [
+       8.89,
+       -0.43
+      ],
+      [
+       13.8,
+       1.58
+      ],
+      [
+       15.81,
+       -3.33
+      ]
+     ],
+     "z": [
+      -0.24,
+      0.6
+     ]
+    }
+   ],
+   "pin": [
+    12.35,
+    -1.88,
+    4.08
+   ],
+   "lineEnd": null,
+   "strong": false
+  },
+  {
+   "id": "tables",
+   "label": "4",
+   "icon": null,
+   "title": "Strefa stołów szachowych i piknikowych",
+   "lines": [
+    {
+     "text": "Cztery stoły szachowe i dwa stoły z ławami."
+    }
+   ],
+   "note": "Rozmieszczenie jest z projektu, wysokość stołów i drzew przykładowa.",
+   "project": true,
+   "map": false,
+   "shapes": [
+    {
+     "type": "prism",
+     "polygon": [
+      [
+       -7.23,
+       20.73
+      ],
+      [
+       -8.29,
+       25.47
+      ],
+      [
+       -9.41,
+       31.61
+      ],
+      [
+       -9.42,
+       31.72
+      ],
+      [
+       -9.71,
+       36.02
+      ],
+      [
+       -6.89,
+       37.1
+      ],
+      [
+       -4.22,
+       33.79
+      ],
+      [
+       -4.16,
+       33.7
+      ],
+      [
+       -0.6,
+       28.68
+      ],
+      [
+       2.23,
+       24.52
+      ]
+     ],
+     "z": [
+      -0.42,
+      5.09
+     ]
+    }
+   ],
+   "pin": [
+    -4.97,
+    28.41,
+    6.59
+   ],
+   "lineEnd": null,
+   "strong": false
+  },
+  {
+   "id": "driveway",
+   "label": "5",
+   "icon": null,
+   "title": "Zjazd na ul. Terespolską",
+   "lines": [
+    {
+     "text": "Na planie opisany jako „w realizacji”."
+    },
+    {
+     "text": "Zostanie prawdopodobnie wybudowany wraz z remontem ul. Mińskiej."
+    },
+    {
+     "text": "Leży poza działką i nie należy do projektu, dlatego jest półprzezroczysty."
+    }
+   ],
+   "note": null,
+   "project": true,
+   "map": false,
+   "shapes": [
+    {
+     "type": "prism",
+     "polygon": [
+      [
+       -34.63,
+       30.25
+      ],
+      [
+       -37.01,
+       25.51
+      ],
+      [
+       -42.39,
+       28.5
+      ],
+      [
+       -43.21,
+       28.66
+      ],
+      [
+       -44.03,
+       28.75
+      ],
+      [
+       -44.85,
+       28.67
+      ],
+      [
+       -45.46,
+       28.51
+      ],
+      [
+       -45.88,
+       28.35
+      ],
+      [
+       -46.69,
+       27.88
+      ],
+      [
+       -40.74,
+       39.26
+      ],
+      [
+       -40.57,
+       39.18
+      ],
+      [
+       -41.07,
+       37.72
+      ],
+      [
+       -41.19,
+       37.23
+      ],
+      [
+       -41.23,
+       36.69
+      ],
+      [
+       -41.19,
+       36.12
+      ],
+      [
+       -41.08,
+       35.58
+      ],
+      [
+       -40.87,
+       35.09
+      ],
+      [
+       -40.63,
+       34.64
+      ],
+      [
+       -40.3,
+       34.18
+      ],
+      [
+       -39.88,
+       33.67
+      ],
+      [
+       -39.48,
+       33.09
+      ]
+     ],
+     "z": [
+      -0.17,
+      0.83
+     ]
+    }
+   ],
+   "pin": [
+    -40.42,
+    30.7,
+    4.27
+   ],
+   "lineEnd": null,
+   "strong": false
+  },
+  {
+   "id": "barrier",
+   "label": "6",
+   "icon": null,
+   "title": "Szlaban",
+   "lines": [
+    {
+     "text": "Na wjeździe od strony zjazdu, szerokości 5 m."
+    }
+   ],
+   "note": "Wysokość jest przykładowa.",
+   "project": true,
+   "map": false,
+   "shapes": [
+    {
+     "type": "prism",
+     "polygon": [
+      [
+       -31.96,
+       22.54
+      ],
+      [
+       -32.12,
+       22.18
+      ],
+      [
+       -32.85,
+       22.51
+      ],
+      [
+       -30.55,
+       27.56
+      ],
+      [
+       -30.39,
+       27.92
+      ],
+      [
+       -29.66,
+       27.59
+      ]
+     ],
+     "z": [
+      -0.04,
+      1.47
+     ]
+    }
+   ],
+   "pin": [
+    -31.26,
+    25.05,
+    4.26
+   ],
+   "lineEnd": null,
+   "strong": false
+  },
+  {
+   "id": "column",
+   "label": "7",
+   "icon": null,
+   "title": "Słup ogłoszeniowy",
+   "lines": [
+    {
+     "text": "Średnica 1,35 m."
+    }
+   ],
+   "note": "Wysokość 3,5 m jest przykładowa, typowa dla warszawskich słupów.",
+   "project": true,
+   "map": false,
+   "shapes": [
+    {
+     "type": "cylinder",
+     "xy": [
+      -7.12,
+      11.43
+     ],
+     "z": [
+      0.23,
+      3.92
+     ],
+     "radius": 0.88
+    }
+   ],
+   "pin": [
+    -7.12,
+    11.43,
+    5.42
+   ],
+   "lineEnd": null,
+   "strong": false
+  },
+  {
+   "id": "deck",
+   "label": "",
+   "icon": "deck",
+   "title": "Taras z desek kompozytowych",
+   "lines": [
+    {
+     "text": "Taras przy budynku, z trzema stopniami i pochylnią o spadku 8%."
+    },
+    {
+     "text": "Z tych samych desek jest taras na dachu parteru."
+    }
+   ],
+   "note": "Kolor desek nie jest podany w projekcie. Szary jest przykładowy, jak w legendzie planu.",
+   "project": true,
+   "map": false,
+   "shapes": [
+    {
+     "type": "prism",
+     "polygon": [
+      [
+       -2.9,
+       15.92
+      ],
+      [
+       1.67,
+       17.79
+      ],
+      [
+       2.16,
+       16.58
+      ],
+      [
+       -2.36,
+       14.74
+      ],
+      [
+       6.83,
+       -7.74
+      ],
+      [
+       11.34,
+       -5.89
+      ],
+      [
+       12.18,
+       -7.93
+      ],
+      [
+       4.23,
+       -11.17
+      ],
+      [
+       -6.28,
+       14.54
+      ],
+      [
+       -5.95,
+       14.67
+      ],
+      [
+       -5.68,
+       14.79
+      ]
+     ],
+     "z": [
+      0.08,
+      0.56
+     ]
+    }
+   ],
+   "pin": [
+    1.42,
+    2.21,
+    4.12
+   ],
+   "lineEnd": null,
+   "strong": false
+  },
+  {
+   "id": "paving",
+   "label": "",
+   "icon": "paving",
+   "title": "Utwardzenia mineralno-żywiczne",
+   "lines": [
+    {
+     "text": "Nawierzchnia ścieżek i placu przy budynku, razem z miejscami postojowymi."
+    },
+    {
+     "text": "Ścieżki mają 2 i 5 m szerokości."
+    }
+   ],
+   "note": "Kolor jest przykładowy, jak w legendzie planu.",
+   "project": true,
+   "map": false,
+   "shapes": [
+    {
+     "type": "drape",
+     "polygon": [
+      [
+       -10.86,
+       37.51
+      ],
+      [
+       -9.85,
+       37.57
+      ],
+      [
+       -8.88,
+       37.86
+      ],
+      [
+       -8.0,
+       38.35
+      ],
+      [
+       -7.25,
+       39.03
+      ],
+      [
+       -6.62,
+       39.94
+      ],
+      [
+       3.9,
+       25.51
+      ],
+      [
+       15.68,
+       -3.28
+      ],
+      [
+       11.01,
+       -5.18
+      ],
+      [
+       9.24,
+       -6.75
+      ],
+      [
+       6.83,
+       -7.74
+      ],
+      [
+       -2.36,
+       14.74
+      ],
+      [
+       2.16,
+       16.58
+      ],
+      [
+       1.67,
+       17.79
+      ],
+      [
+       -2.9,
+       15.92
+      ],
+      [
+       -5.68,
+       14.79
+      ],
+      [
+       -5.95,
+       14.67
+      ],
+      [
+       -6.28,
+       14.54
+      ],
+      [
+       4.23,
+       -11.17
+      ],
+      [
+       4.32,
+       -11.14
+      ],
+      [
+       11.49,
+       -28.64
+      ],
+      [
+       9.15,
+       -28.47
+      ],
+      [
+       -5.62,
+       7.66
+      ],
+      [
+       -37.14,
+       25.7
+      ],
+      [
+       -34.85,
+       30.26
+      ],
+      [
+       -13.82,
+       18.3
+      ],
+      [
+       -9.18,
+       20.21
+      ],
+      [
+       -11.93,
+       37.69
+      ]
+     ],
+     "holes": [
+      [
+       [
+        -7.08,
+        21.0
+       ],
+       [
+        1.92,
+        24.61
+       ],
+       [
+        0.23,
+        26.93
+       ],
+       [
+        -7.51,
+        23.94
+       ]
+      ],
+      [
+       [
+        -8.08,
+        27.1
+       ],
+       [
+        -1.67,
+        29.68
+       ],
+       [
+        -3.37,
+        31.96
+       ],
+       [
+        -8.47,
+        30.02
+       ]
+      ],
+      [
+       [
+        -9.03,
+        33.02
+       ],
+       [
+        -5.47,
+        34.5
+       ],
+       [
+        -6.96,
+        36.86
+       ],
+       [
+        -9.49,
+        35.89
+       ]
+      ]
+     ],
+     "dz": [
+      -0.3,
+      0.25
+     ]
+    }
+   ],
+   "pin": [
+    -26.0,
+    22.3,
+    4.22
+   ],
+   "lineEnd": null,
+   "strong": false
+  },
+  {
+   "id": "lamps",
+   "label": "",
+   "icon": "lamp",
+   "title": "Latarnie parkowe",
+   "lines": [
+    {
+     "text": "Siedem projektowanych latarni przy ścieżkach."
+    }
+   ],
+   "note": "Plan pokazuje tylko ich położenie. Wysokość 4,5 m i wygląd są przykładowe.",
+   "project": true,
+   "map": false,
+   "shapes": [
+    {
+     "type": "cylinder",
+     "xy": [
+      -10.77,
+      27.52
+     ],
+     "z": [
+      0.13,
+      4.81
+     ],
+     "radius": 0.39
+    },
+    {
+     "type": "cylinder",
+     "xy": [
+      -0.09,
+      31.79
+     ],
+     "z": [
+      -0.05,
+      4.63
+     ],
+     "radius": 0.39
+    },
+    {
+     "type": "cylinder",
+     "xy": [
+      -21.72,
+      16.31
+     ],
+     "z": [
+      0.27,
+      4.95
+     ],
+     "radius": 0.39
+    },
+    {
+     "type": "cylinder",
+     "xy": [
+      -6.03,
+      7.3
+     ],
+     "z": [
+      0.23,
+      4.91
+     ],
+     "radius": 0.39
+    },
+    {
+     "type": "cylinder",
+     "xy": [
+      0.47,
+      -8.9
+     ],
+     "z": [
+      0.09,
+      4.77
+     ],
+     "radius": 0.39
+    },
+    {
+     "type": "cylinder",
+     "xy": [
+      7.21,
+      -25.21
+     ],
+     "z": [
+      0.23,
+      4.91
+     ],
+     "radius": 0.39
+    },
+    {
+     "type": "cylinder",
+     "xy": [
+      14.5,
+      -4.3
+     ],
+     "z": [
+      0.11,
+      4.79
+     ],
+     "radius": 0.39
+    }
+   ],
+   "pin": [
+    -21.72,
+    16.31,
+    6.45
+   ],
+   "lineEnd": 4.8,
+   "strong": true
+  },
+  {
+   "id": "bikes",
+   "label": "",
+   "icon": "bike",
+   "title": "Parking rowerowy",
+   "lines": [
+    {
+     "text": "Cztery stojaki dla rowerów."
+    }
+   ],
+   "note": "Plan pokazuje tylko ich położenie. Kształt i wymiary stojaków są przykładowe.",
+   "project": true,
+   "map": false,
+   "shapes": [
+    {
+     "type": "prism",
+     "polygon": [
+      [
+       -12.47,
+       16.93
+      ],
+      [
+       -12.58,
+       16.94
+      ],
+      [
+       -12.69,
+       16.95
+      ],
+      [
+       -12.8,
+       16.98
+      ],
+      [
+       -12.91,
+       17.02
+      ],
+      [
+       -13.01,
+       17.07
+      ],
+      [
+       -13.11,
+       17.12
+      ],
+      [
+       -13.2,
+       17.19
+      ],
+      [
+       -13.28,
+       17.27
+      ],
+      [
+       -13.36,
+       17.35
+      ],
+      [
+       -13.43,
+       17.44
+      ],
+      [
+       -13.48,
+       17.54
+      ],
+      [
+       -13.53,
+       17.64
+      ],
+      [
+       -13.57,
+       17.75
+      ],
+      [
+       -13.6,
+       17.86
+      ],
+      [
+       -13.61,
+       17.97
+      ],
+      [
+       -13.62,
+       18.08
+      ],
+      [
+       -13.61,
+       18.19
+      ],
+      [
+       -13.6,
+       18.3
+      ],
+      [
+       -13.57,
+       18.41
+      ],
+      [
+       -13.53,
+       18.52
+      ],
+      [
+       -13.48,
+       18.62
+      ],
+      [
+       -13.43,
+       18.72
+      ],
+      [
+       -13.36,
+       18.81
+      ],
+      [
+       -13.28,
+       18.89
+      ],
+      [
+       -13.2,
+       18.97
+      ],
+      [
+       -13.11,
+       19.04
+      ],
+      [
+       -13.01,
+       19.09
+      ],
+      [
+       -12.13,
+       19.54
+      ],
+      [
+       -12.04,
+       19.58
+      ],
+      [
+       -11.24,
+       19.93
+      ],
+      [
+       -11.14,
+       19.97
+      ],
+      [
+       -10.29,
+       20.23
+      ],
+      [
+       -10.18,
+       20.26
+      ],
+      [
+       -10.07,
+       20.27
+      ],
+      [
+       -9.96,
+       20.28
+      ],
+      [
+       -9.85,
+       20.27
+      ],
+      [
+       -9.74,
+       20.26
+      ],
+      [
+       -9.63,
+       20.23
+      ],
+      [
+       -9.52,
+       20.19
+      ],
+      [
+       -9.42,
+       20.14
+      ],
+      [
+       -9.32,
+       20.09
+      ],
+      [
+       -9.23,
+       20.02
+      ],
+      [
+       -9.15,
+       19.94
+      ],
+      [
+       -9.07,
+       19.86
+      ],
+      [
+       -9.0,
+       19.77
+      ],
+      [
+       -8.95,
+       19.67
+      ],
+      [
+       -8.9,
+       19.57
+      ],
+      [
+       -8.86,
+       19.46
+      ],
+      [
+       -8.83,
+       19.35
+      ],
+      [
+       -8.82,
+       19.24
+      ],
+      [
+       -8.81,
+       19.13
+      ],
+      [
+       -8.82,
+       19.02
+      ],
+      [
+       -8.83,
+       18.91
+      ],
+      [
+       -8.86,
+       18.8
+      ],
+      [
+       -8.9,
+       18.69
+      ],
+      [
+       -8.95,
+       18.59
+      ],
+      [
+       -9.0,
+       18.49
+      ],
+      [
+       -9.07,
+       18.4
+      ],
+      [
+       -9.15,
+       18.32
+      ],
+      [
+       -9.23,
+       18.24
+      ],
+      [
+       -9.32,
+       18.17
+      ],
+      [
+       -9.42,
+       18.12
+      ],
+      [
+       -9.52,
+       18.07
+      ],
+      [
+       -12.03,
+       17.02
+      ],
+      [
+       -12.14,
+       16.98
+      ],
+      [
+       -12.25,
+       16.95
+      ],
+      [
+       -12.36,
+       16.94
+      ]
+     ],
+     "z": [
+      -0.24,
+      1.13
+     ]
+    }
+   ],
+   "pin": [
+    -11.22,
+    18.62,
+    4.09
+   ],
+   "lineEnd": null,
+   "strong": false
+  },
+  {
+   "id": "young_trees",
+   "label": "",
+   "icon": "tree",
+   "title": "Istniejące drzewa z nasadzeń z budżetu obywatelskiego",
+   "lines": [
+    {
+     "text": "Drzewa liściaste i iglaste, już posadzone."
+    }
+   ],
+   "note": "Wysokości są szacunkowe.",
+   "project": false,
+   "map": false,
+   "shapes": [
+    {
+     "type": "cylinder",
+     "xy": [
+      -27.96,
+      33.78
+     ],
+     "z": [
+      0.33,
+      4.9
+     ],
+     "radius": 1.48
+    },
+    {
+     "type": "cylinder",
+     "xy": [
+      -30.26,
+      29.62
+     ],
+     "z": [
+      0.33,
+      4.9
+     ],
+     "radius": 1.48
+    },
+    {
+     "type": "cylinder",
+     "xy": [
+      -35.64,
+      21.16
+     ],
+     "z": [
+      0.35,
+      4.92
+     ],
+     "radius": 1.48
+    },
+    {
+     "type": "cylinder",
+     "xy": [
+      -37.45,
+      17.25
+     ],
+     "z": [
+      0.41,
+      4.98
+     ],
+     "radius": 1.48
+    },
+    {
+     "type": "cylinder",
+     "xy": [
+      -39.17,
+      12.5
+     ],
+     "z": [
+      0.44,
+      5.01
+     ],
+     "radius": 1.48
+    },
+    {
+     "type": "cylinder",
+     "xy": [
+      -40.94,
+      8.19
+     ],
+     "z": [
+      0.41,
+      4.98
+     ],
+     "radius": 1.48
+    },
+    {
+     "type": "cylinder",
+     "xy": [
+      -41.88,
+      3.05
+     ],
+     "z": [
+      0.45,
+      5.02
+     ],
+     "radius": 1.48
+    },
+    {
+     "type": "cylinder",
+     "xy": [
+      -42.77,
+      -1.71
+     ],
+     "z": [
+      0.44,
+      5.01
+     ],
+     "radius": 1.48
+    },
+    {
+     "type": "cylinder",
+     "xy": [
+      -43.77,
+      -8.13
+     ],
+     "z": [
+      0.44,
+      5.01
+     ],
+     "radius": 1.48
+    },
+    {
+     "type": "cylinder",
+     "xy": [
+      -44.86,
+      -12.63
+     ],
+     "z": [
+      0.47,
+      5.04
+     ],
+     "radius": 1.48
+    },
+    {
+     "type": "cylinder",
+     "xy": [
+      -44.68,
+      -17.68
+     ],
+     "z": [
+      0.53,
+      5.1
+     ],
+     "radius": 1.48
+    },
+    {
+     "type": "cylinder",
+     "xy": [
+      -22.69,
+      37.53
+     ],
+     "z": [
+      0.36,
+      2.95
+     ],
+     "radius": 0.82
+    },
+    {
+     "type": "cylinder",
+     "xy": [
+      -37.52,
+      -0.9
+     ],
+     "z": [
+      0.4,
+      2.99
+     ],
+     "radius": 0.82
+    },
+    {
+     "type": "cylinder",
+     "xy": [
+      -40.15,
+      -15.84
+     ],
+     "z": [
+      0.47,
+      3.06
+     ],
+     "radius": 0.82
+    }
+   ],
+   "pin": [
+    -40.94,
+    8.19,
+    6.6
+   ],
+   "lineEnd": null,
+   "strong": false
+  }
+ ]
 }

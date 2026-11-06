@@ -15,7 +15,13 @@ const contextName = MAPS.includes(asked) ? asked : isLocal ? config.localContext
 const useGoogle = contextName === "google";
 const isSmallScreen = matchMedia("(max-width: 640px)").matches;
 
-const site = await (await fetch("./site.json")).json();
+const [site, siteTrees] = await Promise.all([
+  fetch("./site.json").then((r) => r.json()),
+  // The trees standing where the project paves, from scripts/gugik_surroundings.py. The page works without them.
+  fetch("./site_trees.json")
+    .then((r) => (r.ok ? r.json() : null))
+    .catch(() => null),
+]);
 const statusEl = document.getElementById("status");
 const setStatus = (text) => {
   statusEl.textContent = text || "";
@@ -294,6 +300,12 @@ const DRAG_WITH_CTRL = [
 const isMac = /Mac|iPhone|iPad/.test(navigator.platform);
 const isTouch = matchMedia("(pointer: coarse)").matches;
 const controlsHint = document.getElementById("controls-hint");
+// Turning on a phone was too fast (Jarek, 2026-11-06): 2.5 times slower on touch screens. Every turn (the orbit, and the
+// two-finger twist and tilt) goes through Cesium's rotate3D, whose rate is (distance - 1) capped at _maximumRotateRate,
+// 1.77. Beyond about 3 m from the centre of the turn, which is always here, the cap sets the speed. It's private, so
+// recheck it on any Cesium upgrade.
+const TOUCH_TURN_SLOWDOWN = 2.5;
+if (isTouch) controller._maximumRotateRate /= TOUCH_TURN_SLOWDOWN;
 
 function setControls() {
   if (orbiting) {
@@ -583,6 +595,201 @@ async function openGoogleTiles() {
   return tileset;
 }
 
+// --- marked places: their shapes and highlight ---------------------------------------------------------------------
+// The places on the site plan's legend, and a "?" over the GUGiK trees standing on the project's paving (viewer.markers in
+// the spec, resolved by scripts/spec_to_site.py). Each has a pin. Hovering the pin or the object lights the object up,
+// and clicking either opens its popup. Shapes are in local metres: prisms, drapes, cylinders and ellipsoids. Each
+// marker tints its own layer: the model's objects in model.glb, the map's in surroundings.glb or, on the Google map, in
+// the photogrammetry.
+const MARK_COLOUR = Cesium.Color.fromCssColorString("#ffd54a");
+
+// The trees are GUGiK's crowns and trunks, as surroundings.glb draws them (site_trees.json). On the Geoportal map the
+// crowns are lumpy, reaching a little past their radii. Google's photogrammetry trees match GUGiK's only roughly, so more
+// there, with the trunks starting clear of the ground, which would be tinted too.
+function withSiteTrees(marker) {
+  if (!siteTrees?.crowns?.length) return null;
+  const scale = useGoogle ? 1.2 : siteTrees.crownLumps;
+  const pad = useGoogle ? 0.6 : 0.15;
+  const xs = siteTrees.crowns.map((c) => c.centre[0]);
+  const ys = siteTrees.crowns.map((c) => c.centre[1]);
+  const top = Math.max(...siteTrees.crowns.map((c) => c.centre[2] + c.radii[2]));
+  return {
+    ...marker,
+    shapes: [
+      ...siteTrees.crowns.map((c) => ({ type: "ellipsoid", centre: c.centre, radii: c.radii.map((r) => r * scale + pad) })),
+      ...siteTrees.trunks.map((t) => ({ type: "cylinder", xy: t.xy, z: [t.z[0] + (useGoogle ? 1 : 0), t.z[1]], radius: t.radius * 1.3 + pad })),
+    ],
+    pin: [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2, top + 1], // a metre over the highest crown
+  };
+}
+const markers = site.markers
+  .map((m) => (m.shapes.some((s) => s.type === "site_trees") ? withSiteTrees(m) : m))
+  .filter(Boolean)
+  .map((m, index) => ({ ...m, index }));
+
+// Prisms and drapes have an outline and maybe holes. A drape is a surface laid on the slope: its z range is above the
+// ground under each point, and the shader lights only its faces turned up. The rest have a fixed z range.
+const ringsOf = (s) => [s.polygon, ...(s.holes ?? [])];
+
+// `slack` widens the z ranges, for points read from the depth under the pointer, which are a few centimetres out.
+function inShape(s, p, slack = 0) {
+  if (s.type === "ellipsoid") {
+    const [c, r] = [s.centre, s.radii];
+    return ((p.x - c[0]) / r[0]) ** 2 + ((p.y - c[1]) / r[1]) ** 2 + ((p.z - c[2]) / r[2]) ** 2 <= 1;
+  }
+  const ground = s.type === "drape" ? groundAt(p.x, p.y) : 0;
+  const [z0, z1] = s.type === "drape" ? [ground + s.dz[0], ground + s.dz[1]] : s.z;
+  if (p.z < z0 - slack || p.z > z1 + slack) return false;
+  if (s.type === "cylinder") return (p.x - s.xy[0]) ** 2 + (p.y - s.xy[1]) ** 2 <= s.radius ** 2;
+  let inside = false; // count the edges crossed on the way out, the holes' too
+  for (const ring of ringsOf(s)) {
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const [[xi, yi], [xj, yj]] = [ring[i], ring[j]];
+      if (yi > p.y !== yj > p.y && p.x < ((xj - xi) * (p.y - yi)) / (yj - yi) + xi) inside = !inside;
+    }
+  }
+  return inside;
+}
+
+function shapeVolume(s) {
+  if (s.type === "ellipsoid") return (4 / 3) * Math.PI * s.radii[0] * s.radii[1] * s.radii[2];
+  const height = s.type === "drape" ? s.dz[1] - s.dz[0] : s.z[1] - s.z[0];
+  if (s.type === "cylinder") return Math.PI * s.radius ** 2 * height;
+  const ringArea = (ring) => {
+    let area = 0;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) area += ring[j][0] * ring[i][1] - ring[i][0] * ring[j][1];
+    return Math.abs(area) / 2;
+  };
+  return (ringArea(s.polygon) - (s.holes ?? []).reduce((sum, hole) => sum + ringArea(hole), 0)) * height;
+}
+// Where shapes overlap, the smaller object takes the pointer: the column, say, not the paving round it.
+const byPriority = [...markers].sort((a, b) => a.shapes.reduce((v, s) => v + shapeVolume(s), 0) - b.shapes.reduce((v, s) => v + shapeVolume(s), 0));
+
+// The same tests in GLSL, one function per shape, with the numbers written in. p is the point and n its face's normal,
+// both in local metres.
+const glslNumber = (n) => n.toFixed(4);
+function shapeGLSL(s, name) {
+  const f = glslNumber;
+  const g = (n) => (/[.e]/.test(String(n.toPrecision(9))) ? n.toPrecision(9) : `${n.toPrecision(9)}.0`);
+  const v3 = (a) => `vec3(${a.map(f).join(", ")})`;
+  if (s.type === "ellipsoid") return `bool ${name}(vec3 p, vec3 n) { vec3 q = (p - ${v3(s.centre)}) / ${v3(s.radii)}; return dot(q, q) <= 1.0; }`;
+  if (s.type === "cylinder") {
+    return `bool ${name}(vec3 p, vec3 n) { if (p.z < ${f(s.z[0])} || p.z > ${f(s.z[1])}) return false; return distance(p.xy, vec2(${f(s.xy[0])}, ${f(s.xy[1])})) <= ${f(s.radius)}; }`;
+  }
+  const xs = s.polygon.map((q) => q[0]);
+  const ys = s.polygon.map((q) => q[1]);
+  const box = `if (p.x < ${f(Math.min(...xs))} || p.x > ${f(Math.max(...xs))} || p.y < ${f(Math.min(...ys))} || p.y > ${f(Math.max(...ys))}) return false;`;
+  const edges = ringsOf(s).flatMap((ring) =>
+    ring.map(([xi, yi], i) => {
+      const [xj, yj] = ring[(i + ring.length - 1) % ring.length];
+      if (yi === yj) return ""; // an edge along x is never crossed
+      return `if ((${f(yi)} > p.y) != (${f(yj)} > p.y) && p.x < ${g((xj - xi) / (yj - yi))} * (p.y - ${f(yi)}) + ${f(xi)}) c = !c;`;
+    }),
+  );
+  const inside = `${box} bool c = false; ${edges.join(" ")}`;
+  if (s.type === "drape") {
+    // Faces turned up only, within 37° of level, and the ground last, as it's the dearest test.
+    return `bool ${name}(vec3 p, vec3 n) { if (n.z < 0.8) return false; ${inside} if (!c) return false; float g = groundAt(p.xy); return p.z >= g + ${f(s.dz[0])} && p.z <= g + ${f(s.dz[1])}; }`;
+  }
+  return `bool ${name}(vec3 p, vec3 n) { if (p.z < ${f(s.z[0])} || p.z > ${f(s.z[1])}) return false; ${inside} return c; }`;
+}
+
+// groundAt() in GLSL, for drapes: the same inverse-distance interpolation through the survey's spot heights.
+function groundGLSL() {
+  const f = glslNumber;
+  const terms = site.groundSpots.map((s) => `d = p - vec2(${f(s.x)}, ${f(s.y)}); w = 1.0 / max(dot(d, d), 1e-6); t += w * ${f(s.z)}; ws += w;`);
+  return `float groundAt(vec2 p) { vec2 d; float w; float t = 0.0; float ws = 0.0; ${terms.join(" ")} return t / ws; }`;
+}
+
+// A shader for one model, tinting what lies inside the lit marker's shapes. It works in eye coordinates, turned into
+// local metres by a matrix set each frame: model.glb is quantised by gltfpack, so its own coordinates aren't metres.
+// Unlit, it returns at once, and the model looks exactly as without it.
+function markerShader(list) {
+  if (list.length === 0) return null;
+  const functions = [];
+  const branches = list.map((m) => {
+    const names = m.shapes.map((s, k) => {
+      functions.push(shapeGLSL(s, `marker${m.index}_${k}`));
+      return `marker${m.index}_${k}(p, n)`;
+    });
+    return `if (lit == ${m.index}) return ${names.join(" || ")};`;
+  });
+  // Only drapes need the normal, and the map's model may have none.
+  const drapes = list.some((m) => m.shapes.some((s) => s.type === "drape"));
+  const linear = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  const colour = `vec3(${[MARK_COLOUR.red, MARK_COLOUR.green, MARK_COLOUR.blue].map((c) => linear(c).toFixed(4)).join(", ")})`;
+  return new Cesium.CustomShader({
+    uniforms: {
+      u_litMarker: { type: Cesium.UniformType.FLOAT, value: -1 },
+      u_litGlow: { type: Cesium.UniformType.FLOAT, value: 0 },
+      u_eyeToLocal: { type: Cesium.UniformType.MAT4, value: new Cesium.Matrix4() },
+    },
+    fragmentShaderText: `
+${drapes ? groundGLSL() : ""}
+${functions.join("\n")}
+bool inLitMarker(vec3 p, vec3 n, int lit) {
+  ${branches.join("\n  ")}
+  return false;
+}
+void fragmentMain(FragmentInput fsInput, inout czm_modelMaterial material) {
+  if (u_litMarker < 0.0) return;
+  vec3 p = (u_eyeToLocal * vec4(fsInput.attributes.positionEC, 1.0)).xyz;
+  vec3 n = ${drapes ? "normalize((u_eyeToLocal * vec4(fsInput.attributes.normalEC, 0.0)).xyz)" : "vec3(0.0, 0.0, 1.0)"};
+  if (!inLitMarker(p, n, int(u_litMarker + 0.5))) return;
+  // Lighter and a little warmer, not recoloured: mixing in yellow turned the trees' dark green olive.
+  material.diffuse *= vec3(1.5, 1.45, 1.0);
+  // More for thin, dark things, the lamps' poles, on which lightening hardly shows.
+  material.emissive += ${colour} * (0.03 + u_litGlow);
+  // The translucent driveway barely changes otherwise, as the map shows through it.
+  material.alpha = mix(material.alpha, 1.0, 0.4);
+}`,
+  });
+}
+const STRONG_GLOW = 0.5; // for `highlight: strong` in the spec, added to the yellow's emission
+const modelShader = markerShader(markers.filter((m) => !m.map));
+const mapShader = useGoogle ? null : markerShader(markers.filter((m) => m.map));
+const markerShaders = [modelShader, mapShader].filter(Boolean);
+let litIndex = -1; // the marker whose object is lit, if any
+
+// Only while something is lit: the shaders need the camera, in local metres.
+const eyeToLocal = new Cesium.Matrix4();
+const localFromWorld = new Cesium.Matrix4();
+scene.preRender.addEventListener(() => {
+  if (litIndex < 0) return;
+  Cesium.Matrix4.inverseTransformation(modelMatrix, localFromWorld);
+  Cesium.Matrix4.multiply(localFromWorld, camera.inverseViewMatrix, eyeToLocal);
+  for (const shader of markerShaders) shader.setUniform("u_eyeToLocal", eyeToLocal);
+});
+
+// On the Google map, the map's objects are photogrammetry, so a volume tints whatever of the map lies inside it. Placed
+// with the starting height, a few centimetres from the measured one.
+function markerClassification(marker) {
+  const color = Cesium.ColorGeometryInstanceAttribute.fromColor(MARK_COLOUR.withAlpha(0.22));
+  const at = (x, y, z) => Cesium.Matrix4.multiplyByTranslation(modelMatrix, new Cesium.Cartesian3(x, y, z), new Cesium.Matrix4());
+  const vertexFormat = Cesium.VertexFormat.POSITION_ONLY;
+  const instance = (s) => {
+    if (s.type === "ellipsoid") {
+      return new Cesium.GeometryInstance({ geometry: new Cesium.EllipsoidGeometry({ radii: new Cesium.Cartesian3(...s.radii), vertexFormat }), modelMatrix: at(...s.centre), attributes: { color } });
+    }
+    if (s.type === "cylinder") {
+      const geometry = new Cesium.CylinderGeometry({ length: s.z[1] - s.z[0], topRadius: s.radius, bottomRadius: s.radius, vertexFormat });
+      return new Cesium.GeometryInstance({ geometry, modelMatrix: at(s.xy[0], s.xy[1], (s.z[0] + s.z[1]) / 2), attributes: { color } });
+    }
+    const outline = new Cesium.PolygonHierarchy(s.polygon.map(([x, y]) => localToWorld(modelMatrix, x, y, 0)));
+    const geometry = new Cesium.PolygonGeometry({ polygonHierarchy: outline, height: originHeight + s.z[0], extrudedHeight: originHeight + s.z[1], vertexFormat });
+    return new Cesium.GeometryInstance({ geometry, attributes: { color } });
+  };
+  const primitive = new Cesium.ClassificationPrimitive({
+    geometryInstances: marker.shapes.map(instance),
+    classificationType: Cesium.ClassificationType.CESIUM_3D_TILE,
+    allowPicking: false,
+    asynchronous: false,
+  });
+  primitive.show = false;
+  return scene.primitives.add(primitive);
+}
+const classifications = new Map(useGoogle ? markers.filter((m) => m.map).map((m) => [m.index, markerClassification(m)]) : []);
+
 // The Geoportal map's buildings and trees: GUGiK's, already cut to the map limit and clear of the model, standing on the
 // same surveyed ground (scripts/gugik_surroundings.py). One small file, in the model's frame.
 async function loadSurroundings() {
@@ -595,6 +802,7 @@ async function loadSurroundings() {
     // the long flat walls lit at a low angle, and walls facing away from the sun are already darker by their shading.
     shadows: Cesium.ShadowMode.CAST_ONLY,
     credit: GUGIK_CREDIT,
+    customShader: mapShader ?? undefined,
   });
   // Lit like the model, so shaded walls don't go black against the unlit photo.
   surroundings.environmentMapManager.brightness = config.modelAmbientBrightness;
@@ -613,6 +821,7 @@ async function loadModel() {
     upAxis: Cesium.Axis.Y,
     forwardAxis: Cesium.Axis.X,
     shadows: Cesium.ShadowMode.ENABLED,
+    customShader: modelShader ?? undefined,
   });
   // The map's photos are unlit. Without extra ambient light the dark facades go black in the shade.
   model.environmentMapManager.brightness = config.modelAmbientBrightness;
@@ -690,33 +899,216 @@ if (switchState?.project === false) {
   projectBox.dispatchEvent(new Event("change"));
 }
 
-// --- click the building for its basic facts ----------------------------------------------------
+// --- marked places: pins, hover and popups ---------------------------------------------------------------------------
 const info = document.getElementById("info");
-document.getElementById("info-close").addEventListener("click", () => (info.hidden = true));
-const frame = site.buildingFrame;
-const azimuth = Cesium.Math.toRadians(frame.azimuth_true_deg);
+let hoveredPin = null; // marker indexes
+let hoveredObject = null;
+let openMarker = null;
 
-function onBuilding(world) {
-  const inverse = Cesium.Matrix4.inverse(modelMatrix, new Cesium.Matrix4());
-  const local = Cesium.Matrix4.multiplyByPoint(inverse, world, new Cesium.Cartesian3());
-  const dx = local.x - frame.origin_local[0];
-  const dy = local.y - frame.origin_local[1];
-  const u = dx * Math.sin(azimuth) + dy * Math.cos(azimuth);
-  const v = dx * Math.cos(azimuth) - dy * Math.sin(azimuth);
-  return u >= site.footprint.u[0] && u <= site.footprint.u[1] && v >= site.footprint.v[0] && v <= site.footprint.v[1];
+// A pin goes with its object when the project is hidden, unless that's already there. On the Google map the map's
+// objects on the project's paving go with the cut under it, so there they light up only with the project hidden.
+const pinShown = (m) => !m.project || projectBox.checked;
+const objectShown = (m) => pinShown(m) && !(m.map && useGoogle && projectBox.checked);
+
+// What a pin's head shows, and the popup's label with it: the plan's number or "?", an icon, or for a surface a swatch
+// like the plan's legend. The icons are drawn in the heads' text colour.
+const PIN_ICONS = {
+  lamp: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5a6.5 6.5 0 0 0-3.9 11.7c.6.5.9 1.2.9 1.9v1.4h6v-1.4c0-.7.3-1.4.9-1.9A6.5 6.5 0 0 0 12 2.5zM10 20.5h4"/></svg>',
+  bike: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5.5" cy="15.5" r="3.5"/><circle cx="18.5" cy="15.5" r="3.5"/><path d="M5.5 15.5 9 8.5l3 7H5.5M9 8.5h6.5L12 15.5M15.5 8.5l3 7M7.5 6.5h3M15.5 8.5 15 6h2"/></svg>',
+  tree: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7.5 14.5A3.5 3.5 0 0 1 6.2 8.2 4.5 4.5 0 0 1 12 3.5a4.5 4.5 0 0 1 5.8 4.7 3.5 3.5 0 0 1-1.3 6.3z"/><path d="M12 14.5V21"/></svg>',
+  // The legend's swatches, in a yellow head like the rest, so that grey still means hidden.
+  deck: '<span class="swatch swatch-deck"></span>',
+  paving: '<span class="swatch swatch-paving"></span>',
+};
+function showLabel(element, m) {
+  element.classList.toggle("icon", Boolean(PIN_ICONS[m.icon]));
+  if (PIN_ICONS[m.icon]) element.innerHTML = PIN_ICONS[m.icon];
+  else element.textContent = m.label;
 }
 
-new Cesium.ScreenSpaceEventHandler(viewer.canvas).setInputAction((click) => {
-  const picked = scene.pick(click.position);
-  if (picked && picked.primitive === model) {
-    const world = scene.pickPosition(click.position);
-    if (world && onBuilding(world)) {
-      info.hidden = false;
-      return;
-    }
+// The pin under the pointer, else the object, else the open popup's. One at a time.
+function updateHighlight() {
+  const lit = [hoveredPin, hoveredObject, openMarker].find((i) => i !== null) ?? null;
+  litIndex = lit !== null && objectShown(markers[lit]) ? lit : -1;
+  for (const shader of markerShaders) {
+    shader.setUniform("u_litMarker", litIndex);
+    shader.setUniform("u_litGlow", litIndex >= 0 && markers[litIndex].strong ? STRONG_GLOW : 0);
   }
-  info.hidden = true;
-}, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+  for (const [index, primitive] of classifications) primitive.show = index === litIndex;
+  for (const m of markers) m.head.classList.toggle("lit", m.index === lit);
+}
+
+function openPopup(index) {
+  openMarker = index;
+  info.hidden = index === null;
+  if (index !== null) {
+    const m = markers[index];
+    showLabel(document.getElementById("info-label"), m);
+    document.getElementById("info-title").textContent = m.title;
+    const lines = m.lines.filter((line) => !line.map || line.map === contextName);
+    document.getElementById("info-lines").replaceChildren(...lines.map((line) => Object.assign(document.createElement("li"), { textContent: line.text })));
+    const note = document.getElementById("info-note");
+    note.textContent = m.note ?? "";
+    note.hidden = !m.note;
+  }
+  updateHighlight();
+}
+document.getElementById("info-close").addEventListener("click", () => openPopup(null));
+projectBox.addEventListener("change", () => {
+  if (openMarker !== null && !pinShown(markers[openMarker])) openPopup(null);
+  updateHighlight();
+});
+
+// The object under a position on the canvas: the point of the map or model there, inside one of the shapes. Whatever
+// stands in front, a building or another tree, is what's found instead, so objects count only where they can be seen.
+// The point comes from the depth buffer, about 3 cm out from 100 m away, and the deck's shape reaches only 3 cm over it.
+const PICK_SLACK_M = 0.1;
+const toLocalScratch = new Cesium.Matrix4();
+function markerAt(position) {
+  if (!scene.pickPositionSupported) return null;
+  const world = scene.pickPosition(position);
+  if (!world) return null;
+  const p = Cesium.Matrix4.multiplyByPoint(Cesium.Matrix4.inverseTransformation(modelMatrix, toLocalScratch), world, world);
+  return byPriority.find((m) => objectShown(m) && m.shapes.some((s) => inShape(s, p, PICK_SLACK_M)))?.index ?? null;
+}
+
+// Each pin: a numbered head over the object, and a line from it down to just above the ground. The heads are page
+// elements, always in front, so they can be found and clicked. The lines are in the scene, in local metres, so they go
+// into the object they stand on, its roof say, and behind whatever stands in front. Their light halo is translucent,
+// which puts them after the solid scene, so a pointer finds the object behind them, not the line.
+const STEM_GAP_M = 0.3;
+const pinsLayer = document.getElementById("pins");
+const stems = scene.primitives.add(new Cesium.PolylineCollection({ modelMatrix: Cesium.Matrix4.clone(modelMatrix) }));
+// The heads' dark grey, 2 pixels wide, with a light halo a pixel wide each side, and edges softened over a pixel of the
+// screen: Cesium's own outlined line has hard edges, and its halo broke up into dashes.
+const stemMaterial = new Cesium.Material({
+  translucent: true,
+  fabric: {
+    uniforms: { color: Cesium.Color.fromCssColorString("#24313c"), halo: Cesium.Color.WHITE.withAlpha(0.55) },
+    source: `
+in float v_width;
+czm_material czm_getMaterial(czm_materialInput materialInput) {
+  czm_material material = czm_getDefaultMaterial(materialInput);
+  float d = abs(materialInput.st.t - 0.5) * v_width; // pixels from the middle of the line
+  float soft = 0.5 / czm_pixelRatio;
+  float line = 1.0 - smoothstep(1.0 - soft, 1.0 + soft, d);
+  vec4 c = mix(halo, color, line);
+  c.a *= 1.0 - smoothstep(2.0 - soft, 2.0 + soft, d);
+  c = czm_gammaCorrect(c);
+  material.diffuse = c.rgb;
+  material.alpha = c.a;
+  return material;
+}`,
+  },
+});
+for (const m of markers) {
+  m.foot = [m.pin[0], m.pin[1], m.lineEnd ?? groundAt(m.pin[0], m.pin[1]) + STEM_GAP_M]; // or on top of a lamp, say
+  m.stem = stems.add({
+    positions: [new Cesium.Cartesian3(...m.pin), new Cesium.Cartesian3(...m.foot)],
+    width: 5, // pixels, with room for the soft edges
+    material: stemMaterial,
+    show: false,
+  });
+  m.head = Object.assign(document.createElement("button"), { className: "pin-head", title: m.title, hidden: true });
+  showLabel(m.head, m);
+  m.head.setAttribute("aria-label", m.label ? `${m.label}: ${m.title}` : m.title);
+  const hover = (on) => () => {
+    hoveredPin = on ? m.index : hoveredPin === m.index ? null : hoveredPin;
+    updateHighlight();
+  };
+  m.head.addEventListener("pointerenter", hover(true));
+  m.head.addEventListener("pointerleave", hover(false));
+  m.head.addEventListener("focus", hover(true));
+  m.head.addEventListener("blur", hover(false));
+  m.head.addEventListener("click", () => openPopup(m.index));
+  pinsLayer.append(m.head);
+}
+
+const mapEl = document.getElementById("map");
+const toPoint = new Cesium.Cartesian3();
+function onScreen(local) {
+  const world = localToWorld(modelMatrix, ...local);
+  if (Cesium.Cartesian3.dot(Cesium.Cartesian3.subtract(world, camera.positionWC, toPoint), camera.directionWC) <= 0) return undefined;
+  const xy = Cesium.SceneTransforms.worldToWindowCoordinates(scene, world);
+  return xy && { x: xy.x, y: xy.y, distance: Cesium.Cartesian3.magnitude(toPoint) };
+}
+scene.postRender.addEventListener(() => {
+  const loading = mapEl.classList.contains("loading");
+  const { clientWidth: w, clientHeight: h } = scene.canvas;
+  // On the Google map the model is lifted once the ground's height is measured, and the lines with it.
+  if (!Cesium.Matrix4.equals(stems.modelMatrix, modelMatrix)) Cesium.Matrix4.clone(modelMatrix, stems.modelMatrix);
+  const shown = [];
+  for (const m of markers) {
+    const top = !loading && pinShown(m) ? onScreen(m.pin) : undefined;
+    const show = Boolean(top) && top.x >= 0 && top.y >= 0 && top.x <= w && top.y <= h;
+    if (m.head.hidden === show) m.head.hidden = !show;
+    m.stem.show = show; // a line only under a head
+    if (!show) continue;
+    m.head.style.transform = `translate(${top.x.toFixed(1)}px, ${top.y.toFixed(1)}px) translate(-50%, -100%)`;
+    m.top = top;
+    shown.push([m, top.distance]);
+  }
+  // Nearer heads over farther ones.
+  shown.sort((a, b) => b[1] - a[1]).forEach(([m], rank) => (m.head.style.zIndex = String(rank + 1)));
+  testBehind();
+});
+
+// A head that something stands in front of, a tree say, turns grey and faint, as the line under it is hidden: the
+// nearest surface in the frame just drawn, at the head's middle, is nearer than the pin. A depth read stalls the GPU a
+// little, so one head a frame, each again once the camera has moved, or else every second as tiles load in.
+const BEHIND_MARGIN_M = 0.5;
+const lastEye = new Cesium.Cartesian3();
+const lastDirection = new Cesium.Cartesian3();
+const headMiddle = new Cesium.Cartesian2();
+const behindHit = new Cesium.Cartesian3();
+let viewCount = 0;
+let behindTurn = 0;
+function testBehind() {
+  if (!scene.pickPositionSupported) return;
+  if (!Cesium.Cartesian3.equalsEpsilon(camera.positionWC, lastEye, 0, 0.01) || !Cesium.Cartesian3.equalsEpsilon(camera.directionWC, lastDirection, 1e-5)) {
+    Cesium.Cartesian3.clone(camera.positionWC, lastEye);
+    Cesium.Cartesian3.clone(camera.directionWC, lastDirection);
+    viewCount++;
+  }
+  const now = performance.now();
+  for (let k = 0; k < markers.length; k++) {
+    const m = markers[(behindTurn + k) % markers.length];
+    if (m.head.hidden || (m.testedView === viewCount && now - m.testedAt < 1000)) continue;
+    behindTurn = m.index + 1;
+    [m.testedView, m.testedAt] = [viewCount, now];
+    headMiddle.x = m.top.x;
+    headMiddle.y = m.top.y - m.head.offsetHeight / 2;
+    const hit = headMiddle.y >= 0 ? scene.pickPosition(headMiddle, behindHit) : undefined;
+    m.head.classList.toggle("behind", Boolean(hit) && Cesium.Cartesian3.distance(hit, camera.positionWC) < m.top.distance - BEHIND_MARGIN_M);
+    return;
+  }
+}
+
+// Objects under a mouse: tested at most once a frame, and not while a drag moves the camera. Touch has no hover: a tap
+// opens the popup, and the object stays lit while it's open.
+let hoverAt = null;
+let dragging = false;
+scene.canvas.addEventListener("pointerdown", () => (dragging = true));
+addEventListener("pointerup", () => (dragging = false));
+scene.canvas.addEventListener("pointermove", (event) => {
+  if (event.pointerType === "mouse" && !dragging) hoverAt = new Cesium.Cartesian2(event.offsetX, event.offsetY);
+});
+scene.canvas.addEventListener("pointerleave", () => (hoverAt = new Cesium.Cartesian2(-1, -1)));
+scene.postRender.addEventListener(() => {
+  if (!hoverAt) return;
+  const over = hoverAt.x >= 0 ? markerAt(hoverAt) : null;
+  hoverAt = null;
+  if (over === hoveredObject) return;
+  hoveredObject = over;
+  scene.canvas.style.cursor = over !== null ? "pointer" : "";
+  updateHighlight();
+});
+
+// Cesium's own click actions select and track entities, which the page has none of. They render a picking pass first,
+// which draws the pins' lines into the depth read here, so a click on an object behind a line found the line.
+viewer.screenSpaceEventHandler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_CLICK);
+viewer.screenSpaceEventHandler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
+new Cesium.ScreenSpaceEventHandler(viewer.canvas).setInputAction((click) => openPopup(markerAt(click.position)), Cesium.ScreenSpaceEventType.LEFT_CLICK);
 
 if (!clippingSupported) {
   console.warn("Clipping polygons are not supported here: the old map mesh stays visible under the project.");
@@ -832,4 +1224,16 @@ window.app = {
   localToWorld,
   cameraTarget,
   contextName,
+  markers: {
+    list: markers,
+    stems,
+    // The marker whose object is lit, and the one whose popup is open, by id.
+    get lit() {
+      return litIndex >= 0 ? markers[litIndex].id : null;
+    },
+    get open() {
+      return openMarker === null ? null : markers[openMarker].id;
+    },
+    markerAt: (position) => markers[markerAt(position)]?.id ?? null,
+  },
 };

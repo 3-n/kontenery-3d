@@ -11,6 +11,8 @@
 </head>
 <body>
   <div id="map" class="loading"></div>
+  <!-- The marked places' pins, placed by main.js each frame. Before the panel, which covers them. -->
+  <div id="pins"></div>
 
   <details id="panel" open>
     <summary>
@@ -62,18 +64,14 @@
     if (matchMedia("(max-width: 640px)").matches) document.getElementById("panel").open = false;
   </script>
 
+  <!-- Filled by main.js from the marked place clicked: viewer.markers in the spec. -->
   <div id="info" hidden>
     <button id="info-close" aria-label="Zamknij">×</button>
-    <h3>Budynek usługowy</h3>
-    <ul>
-      <li>Parter i antresola, taras na dachu parteru</li>
-      <li>Wysokość: 5,92 m nad terenem</li>
-      <li>Pomieszczenia łącznie 94 m², w tym pomieszczenie usługowe 43,6 m² i antresola 12,2 m²</li>
-      <li>Kontenery stalowe, elewacja z blachy w kolorze grafitowym</li>
-      <li>Toalety damska, męska i dla osób z niepełnosprawnościami</li>
-    </ul>
+    <h3><span id="info-label" class="pin-label"></span> <span id="info-title"></span></h3>
+    <ul id="info-lines"></ul>
+    <p class="hint" id="info-note" hidden></p>
   </div>
-  <!-- After #info, so the phone layout can hide it while the facts are open: see style.css. -->
+  <!-- After #info, so the phone layout can hide it while the popup is open: see style.css. -->
   <button id="reset-view" hidden>↺ Wróć do widoku</button>
 
   <div id="status" role="status">Wczytywanie mapy…</div>
