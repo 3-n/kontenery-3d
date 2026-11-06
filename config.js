@@ -13,4 +13,7 @@ export const config = {
   initialCamera: "overview",
   shadowDepthBias: 0.0003,
   modelAmbientBrightness: 2.0,
+  // Google map detail on phones, in pixels of error allowed on screen (Cesium's maximumScreenSpaceError). Desktop uses
+  // 16. Higher loads faster and less, and looks blurrier.
+  phoneScreenSpaceError: 24,
 };

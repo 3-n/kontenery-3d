@@ -359,6 +359,21 @@ for (const button of document.querySelectorAll("#maps button")) {
 }
 document.getElementById(`map-note-${contextName}`).hidden = false;
 
+// When the Google map fails, say with a rejected token or after too many loads too quickly, offer the Geoportal map,
+// which needs neither. The message itself comes from the handler in index.html, which runs first and replaces the
+// status text, button included, on each error.
+if (useGoogle) {
+  for (const type of ["error", "unhandledrejection"]) {
+    addEventListener(type, () => {
+      const button = document.createElement("button");
+      button.id = "fallback-map";
+      button.textContent = "Otwórz mapę Geoportal";
+      button.addEventListener("click", () => switchMap("geoportal"));
+      statusEl.append(" ", button);
+    });
+  }
+}
+
 // --- date and time ------------------------------------------------------------------------
 const dateInput = document.getElementById("date");
 const timeInput = document.getElementById("time");
@@ -443,11 +458,12 @@ function mapLimitPlanes(tileset) {
 // paving stay: the tężnia is already there, and the map is older.
 const projectCuts = [];
 
-async function loadGoogleTiles() {
+// Opens the tileset: Cesium ion's endpoint, then Google's root tile. Nothing more is fetched until it's added to the scene.
+async function openGoogleTiles() {
   const tileset = await Cesium.createGooglePhotorealistic3DTileset(
     { onlyUsingWithGoogleGeocoder: true },
     {
-      maximumScreenSpaceError: isSmallScreen ? 24 : 16,
+      maximumScreenSpaceError: isSmallScreen ? config.phoneScreenSpaceError : 16,
       // On by default for these tiles. Before detail loads it reads heights off the coarse mesh and lifts a
       // street-level camera to about 20 m, for good. Without it you can zoom through the ground, but the view
       // buttons bring you back.
@@ -471,8 +487,6 @@ async function loadGoogleTiles() {
     tileset.clippingPolygons = new Cesium.ClippingPolygonCollection({ polygons: cuts });
   }
   tileset.clippingPlanes = mapLimitPlanes(tileset);
-  scene.primitives.add(tileset);
-  performance.mark("map opened");
   return tileset;
 }
 
@@ -516,10 +530,18 @@ async function loadModel() {
   return model;
 }
 
-// The model first. It's a small file, but it would otherwise wait behind hundreds of map tiles: about 10 s on 4G.
-// The Geoportal map's buildings and trees are a single small file, so they can come alongside.
-const [model, surroundings] = await Promise.all([loadModel(), useGoogle ? null : loadSurroundings()]);
-const tileset = useGoogle ? await loadGoogleTiles() : null;
+// The model first. It's a small file, but it would otherwise wait behind hundreds of map tiles: about 10 s on 4G. The
+// Google tileset is opened alongside, which is two small requests, and only added once the model is read, so its tiles
+// still come after. The Geoportal map's buildings and trees are a single small file, so they can come alongside.
+const [model, surroundings, tileset] = await Promise.all([
+  loadModel(),
+  useGoogle ? null : loadSurroundings(),
+  useGoogle ? openGoogleTiles() : null,
+]);
+if (tileset) {
+  scene.primitives.add(tileset);
+  performance.mark("map opened");
+}
 const whenReady = (m) => new Promise((resolve) => (m.ready ? resolve() : m.readyEvent.addEventListener(() => resolve())));
 const surroundingsReady = useGoogle ? Promise.resolve() : whenReady(surroundings);
 
