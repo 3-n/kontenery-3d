@@ -105,12 +105,12 @@
    ]
   },
   {
-   "id": "across_terespolska",
-   "label": "Z drugiej strony Terespolskiej (6 m)",
+   "id": "minska",
+   "label": "Z okna przy Mińskiej",
    "eye": [
-    -66,
-    68.5,
-    6.5
+    -64.1,
+    72.27,
+    12
    ],
    "target": [
     2,
@@ -606,7 +606,7 @@
      "text": "Istniejąca: stoi tu już dziś."
     }
    ],
-   "note": "Odtworzona z obrysu na mapie do celów projektowych i ze zdjęcia, które pokazuje trzy z ośmiu ścian.",
+   "note": "Odtworzona z obrysu na mapie, model poglądowy.",
    "project": false,
    "map": false,
    "shapes": [
@@ -641,7 +641,7 @@
      "text": "Parter i antresola, taras na dachu parteru"
     },
     {
-     "text": "Wysokość: 5,92 m nad terenem"
+     "text": "Wysokość: ~6 m nad terenem"
     },
     {
      "text": "Pomieszczenia łącznie 94 m², w tym pomieszczenie usługowe 43,6 m² i antresola 12,2 m²"
@@ -749,7 +749,7 @@
      "text": "Cztery stoły szachowe i dwa stoły z ławami."
     }
    ],
-   "note": "Rozmieszczenie jest z projektu, wysokość stołów i drzew przykładowa.",
+   "note": "Rozmieszczenie wg projektu, wysokość stołów i drzew przykładowa.",
    "project": true,
    "map": false,
    "shapes": [
@@ -815,7 +815,7 @@
    "id": "driveway",
    "label": "5",
    "icon": null,
-   "title": "Zjazd na ul. Terespolską",
+   "title": "Zjazd na ul. Mińską",
    "lines": [
     {
      "text": "Na planie opisany jako „w realizacji”."
@@ -943,7 +943,7 @@
      "text": "Na wjeździe od strony zjazdu, szerokości 5 m."
     }
    ],
-   "note": "Wysokość jest przykładowa.",
+   "note": "Wygląd, wysokość, długość przykładowa.",
    "project": true,
    "map": false,
    "shapes": [
@@ -1037,7 +1037,7 @@
      "text": "Z tych samych desek jest taras na dachu parteru."
     }
    ],
-   "note": "Kolor desek nie jest podany w projekcie. Szary jest przykładowy, jak w legendzie planu.",
+   "note": "Kolor desek nie jest podany w projekcie. Kolor wizualizacji przykładowy, jak w legendzie planu.",
    "project": true,
    "map": false,
    "shapes": [
@@ -1420,10 +1420,10 @@
    "title": "Parking rowerowy",
    "lines": [
     {
-     "text": "Cztery stojaki dla rowerów."
+     "text": "Stojaki dla rowerów."
     }
    ],
-   "note": "Plan pokazuje tylko ich położenie. Kształt i wymiary stojaków są przykładowe.",
+   "note": "Plan pokazuje tylko ich położenie. Na projekcie są 4 stojaki. Kształt i wymiary stojaków są przykładowe.",
    "project": true,
    "map": false,
    "shapes": [
