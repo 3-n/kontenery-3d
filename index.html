@@ -20,6 +20,7 @@
 
     <h2>Widok</h2>
     <div id="cameras" class="buttons"></div>
+    <p class="hint" id="controls-hint"></p>
 
     <h2>Mapa</h2>
     <div class="buttons" id="maps">
@@ -74,6 +75,8 @@
       <li>Toalety damska, męska i dla osób z niepełnosprawnościami</li>
     </ul>
   </div>
+  <!-- After #info, so the phone layout can hide it while the facts are open: see style.css. -->
+  <button id="reset-view" hidden>↺ Wróć do widoku</button>
 
   <div id="status" role="status">Wczytywanie mapy…</div>
   <script>

@@ -261,6 +261,7 @@ function startOrbit(view) {
   camera.lookAtTransform(Cesium.Transforms.eastNorthUpToFixedFrame(localToWorld(modelMatrix, ...view.target)));
   camera.constrainedAxis = Cesium.Cartesian3.UNIT_Z;
   orbiting = true;
+  setControls();
 }
 
 function stopOrbit() {
@@ -268,6 +269,7 @@ function stopOrbit() {
   camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
   camera.constrainedAxis = undefined;
   orbiting = false;
+  setControls();
 }
 
 // Collision is off, so nothing else stops the camera going down through the ground.
@@ -278,15 +280,107 @@ scene.preRender.addEventListener(() => {
   if (elevation < MIN_ORBIT_ELEVATION) camera.rotateDown(MIN_ORBIT_ELEVATION - elevation);
 });
 
+// --- mouse and touch controls --------------------------------------------------------------
+// In every view a drag moves the map, a drag with Ctrl (or Cmd) turns around the point under the cursor, a drag with
+// Shift pans, and the wheel zooms. In an orbit view a plain drag, or one with Ctrl, turns around the target instead, and
+// Shift leaves the orbit to pan. On a touch screen one finger drags and two pinch, twist and tilt.
+const { CameraEventType, KeyboardEventModifier } = Cesium;
+const controller = scene.screenSpaceCameraController;
+controller.lookEventTypes = undefined; // Cesium's Shift-drag turns the camera where it stands; here Shift pans
+const DRAG_WITH_CTRL = [
+  { eventType: CameraEventType.LEFT_DRAG, modifier: KeyboardEventModifier.CTRL },
+  { eventType: CameraEventType.RIGHT_DRAG, modifier: KeyboardEventModifier.CTRL },
+];
+const isMac = /Mac|iPhone|iPad/.test(navigator.platform);
+const isTouch = matchMedia("(pointer: coarse)").matches;
+const controlsHint = document.getElementById("controls-hint");
+
+function setControls() {
+  if (orbiting) {
+    // Cesium's own turn ("tilt") does nothing in the orbit's frame, so Ctrl joins the plain drag, which orbits there.
+    controller.rotateEventTypes = [CameraEventType.LEFT_DRAG, ...DRAG_WITH_CTRL];
+    controller.tiltEventTypes = [CameraEventType.MIDDLE_DRAG, CameraEventType.PINCH];
+  } else {
+    // "rotate" is Cesium's name for dragging the globe, which near the ground pans the point under the cursor.
+    controller.rotateEventTypes = [CameraEventType.LEFT_DRAG, { eventType: CameraEventType.LEFT_DRAG, modifier: KeyboardEventModifier.SHIFT }];
+    controller.tiltEventTypes = [CameraEventType.MIDDLE_DRAG, CameraEventType.PINCH, ...DRAG_WITH_CTRL];
+  }
+  const turnKey = isMac ? "Ctrl lub ⌘" : "Ctrl";
+  if (isTouch) {
+    controlsHint.textContent = orbiting
+      ? "Jednym palcem obrócisz widok, dwoma go przybliżysz."
+      : "Jednym palcem przesuniesz widok, dwoma go przybliżysz i obrócisz.";
+  } else {
+    controlsHint.textContent = orbiting
+      ? "Przeciągnij, żeby obrócić widok. Z wciśniętym Shift przesuniesz go, a kółkiem przybliżysz."
+      : `Przeciągnij, żeby przesunąć widok. Z wciśniętym ${turnKey} obrócisz go, a kółkiem przybliżysz.`;
+  }
+}
+setControls();
+
+// Cesium reads only Shift, Ctrl and Alt off each event, so Cmd is passed on as Ctrl: on a Mac, Ctrl with a click is a
+// right click. Capturing on the window runs before Cesium's listeners, which are on the canvas and the document.
+for (const type of ["pointerdown", "pointermove", "pointerup", "mousedown", "mousemove", "mouseup", "wheel"]) {
+  addEventListener(
+    type,
+    (event) => {
+      if (event.metaKey && !event.ctrlKey) Object.defineProperty(event, "ctrlKey", { value: true });
+      // Shift pans, which the orbit's frame can't do, so leave the orbit before Cesium sees the press.
+      if (event.shiftKey && orbiting && (type === "pointerdown" || type === "mousedown") && event.target === scene.canvas) stopOrbit();
+    },
+    { capture: true },
+  );
+}
+
+// --- views and the way back to one --------------------------------------------------------------
 const cameraButtons = document.getElementById("cameras");
+const resetButton = document.getElementById("reset-view");
 let activeView = config.initialCamera;
+let flight = 0; // the flight under way, if any: starting one cancels the last, whose callback must not count
+let flying = false;
+
+function markActive(view) {
+  activeView = view.id;
+  for (const b of cameraButtons.children) b.classList.toggle("active", b.dataset.id === view.id);
+  resetButton.title = `Wróć do widoku „${view.label}”`;
+}
+
 function goTo(id, duration = 1.6) {
   const view = site.cameras.find((c) => c.id === id);
-  activeView = id;
+  markActive(view);
   stopOrbit();
-  camera.flyTo({ ...cameraTarget(view), duration, complete: view.orbit ? () => startOrbit(view) : undefined });
-  for (const b of cameraButtons.children) b.classList.toggle("active", b.dataset.id === id);
+  const thisFlight = ++flight;
+  flying = true;
+  const landed = () => {
+    if (thisFlight === flight) flying = false;
+  };
+  camera.flyTo({
+    ...cameraTarget(view),
+    duration,
+    complete: () => {
+      landed();
+      if (view.orbit) startOrbit(view);
+    },
+    cancel: landed,
+  });
 }
+
+// The button shows whenever the camera is away from the chosen view, whatever moved it: a drag, the wheel, or a switch of
+// maps from a moved camera. The tolerance is well above the centimetres the Google map's height measurement shifts things.
+const AWAY_M = 0.3;
+const AWAY_RAD = Cesium.Math.toRadians(0.5);
+scene.postRender.addEventListener(() => {
+  const view = site.cameras.find((c) => c.id === activeView);
+  let away = false;
+  if (view && !flying) {
+    const preset = cameraTarget(view);
+    away =
+      Cesium.Cartesian3.distance(camera.positionWC, preset.destination) > AWAY_M ||
+      Cesium.Cartesian3.angleBetween(camera.directionWC, preset.orientation.direction) > AWAY_RAD;
+  }
+  if (resetButton.hidden === away) resetButton.hidden = !away;
+});
+resetButton.addEventListener("click", () => goTo(activeView));
 for (const view of site.cameras) {
   const button = document.createElement("button");
   button.textContent = view.label;
@@ -320,8 +414,7 @@ if (switchState) {
     orientation: { direction: asWorldVector(switchState.direction), up: asWorldVector(switchState.up) },
   });
   if (view) {
-    activeView = view.id;
-    for (const b of cameraButtons.children) b.classList.toggle("active", b.dataset.id === view.id);
+    markActive(view);
     if (view.orbit && switchState.orbiting) startOrbit(view);
   }
 }
