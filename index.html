@@ -34,7 +34,8 @@
     </summary>
     <p class="lead">Projektowany budynek z kontenerów na działce 4/1 przy ul. Mińskiej i Terespolskiej, na trójwymiarowej mapie okolicy. Wizualizacja poglądowa na podstawie Warunków Zabudowy (<a href="docs/8_WZ_PPD_2026.pdf" target="_blank" rel="noopener">nr 8/WZ/PPD/2026</a>) oraz Pozwolenia na Budowę (<a href="docs/142_PPD_PB_2026_Terespolska_dz_4-1_ob_3-02-08.pdf" target="_blank" rel="noopener">nr 142/PPD/PB/2026</a>) wraz z <a href="dokumenty.html" target="_blank" rel="noopener">załącznikami</a>.</p>
 
-    <h2>Widok</h2>
+    <h2 id="cameras-heading">Widok</h2>
+    <!-- On a phone this row moves into the title above: see the script after the panel. -->
     <div id="cameras" class="buttons"></div>
     <p class="hint" id="controls-hint"></p>
 
@@ -77,8 +78,24 @@
     </details>
   </details>
   <script>
-    // Here rather than in main.js, so a phone never shows the panel open and then snapping shut.
-    if (matchMedia("(max-width: 640px)").matches) document.getElementById("panel").open = false;
+    {
+      // Here rather than in main.js, so a phone never shows the panel open and then snapping shut, or the views jumping.
+      const phone = matchMedia("(max-width: 640px)");
+      const panel = document.getElementById("panel");
+      if (phone.matches) panel.open = false;
+      // On a phone the view buttons go in the panel's title, under it, as one row that scrolls sideways (style.css), so
+      // they show above the lead and with the panel folded too (Jarek, 2026-11-07). Everything else in a <details> but
+      // its <summary> is hidden while it's folded, hence the move. Back in place when the window widens.
+      const views = document.getElementById("cameras");
+      const placeViews = () => {
+        if (phone.matches) panel.querySelector(":scope > summary").append(views);
+        else document.getElementById("cameras-heading").after(views);
+      };
+      placeViews();
+      phone.addEventListener("change", placeViews);
+      // In the title, a tap on the row (between buttons, say) would fold or unfold the panel. The buttons still work.
+      views.addEventListener("click", (event) => event.preventDefault());
+    }
   </script>
 
   <!-- Filled by main.js from the marked place clicked: viewer.markers in the spec. -->

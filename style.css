@@ -147,8 +147,24 @@ output { font-variant-numeric: tabular-nums; font-weight: 600; }
 /* Keep the map's credits and logos readable and clear of the panel. */
 .cesium-viewer-bottom { max-width: 100%; }
 
+/* On a phone the view buttons are in the panel's title (moved there by index.html): one row, scrolling sideways, from
+   edge to edge of the panel so they slide out under its sides. Not bold like the title, and not a toggle like it. */
+#panel > summary #cameras {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  margin: 8px -14px 0;
+  padding: 0 14px 2px;
+  font-weight: 400;
+  cursor: auto;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+#panel > summary #cameras::-webkit-scrollbar { display: none; }
+#panel > summary #cameras button { flex: none; white-space: nowrap; }
+
 @media (max-width: 640px) {
   #panel { width: calc(100% - 24px); max-height: 55%; }
+  #cameras-heading { display: none; }
   #info { top: auto; bottom: 64px; left: 12px; right: 12px; width: auto; }
   /* The credits can take two lines here, so the button goes where the facts open, and steps aside while they're open. */
   #reset-view { bottom: 64px; }
