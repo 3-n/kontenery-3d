@@ -24,6 +24,7 @@ const [site, siteTrees] = await Promise.all([
 ]);
 const statusEl = document.getElementById("status");
 const setStatus = (text) => {
+  if (statusEl.classList.contains("final")) return; // see showGraphicsFailure
   // Any other message, or none, ends the loading bar (see "loading progress").
   statusEl.classList.remove("progress");
   statusEl.removeAttribute("aria-busy");
@@ -180,25 +181,60 @@ function orthophotos() {
 }
 
 
-const viewer = new Cesium.Viewer("map", {
-  geocoder: false, // also means the token needs no "geocode" scope
-  baseLayerPicker: false,
-  homeButton: false,
-  sceneModePicker: false,
-  navigationHelpButton: false,
-  animation: false,
-  timeline: false,
-  fullscreenButton: false,
-  infoBox: false,
-  selectionIndicator: false,
-  shadows: true,
-  terrainShadows: Cesium.ShadowMode.RECEIVE_ONLY,
-  // The Google tiles replace the globe entirely. The Geoportal map lays the aerial photo on the surveyed ground.
-  globe: useGoogle ? false : undefined,
-  baseLayer: useGoogle ? false : new Cesium.ImageryLayer(plainHaze()),
-  terrainProvider: useGoogle ? undefined : surveyedGround(),
-});
+// --- when the browser can't draw the map -----------------------------------------------------------------------------
+// WebGL refused when the viewer opens, or the context lost later: Safari drops it when the GPU stops answering for long,
+// and then refuses it to the page until the browser is restarted. Cesium can't come back from either, so the page says
+// so in Polish, instead of Cesium's English panel or a loading bar that stops, and shows the link preview's picture of
+// the overview. The message is final: the errors that follow a lost context would otherwise replace it.
+function showGraphicsFailure(error) {
+  if (error) console.error(error);
+  if (statusEl.classList.contains("final")) return;
+  setStatus(
+    "Nie udało się wyświetlić modelu 3D: ta przeglądarka nie poradziła sobie z grafiką 3D (WebGL) albo ją wyłączyła. " +
+      "W tle jest widok ogólny jako zdjęcie. Zamknij przeglądarkę całkowicie i otwórz stronę jeszcze raz albo otwórz ją na innym urządzeniu.",
+  );
+  statusEl.classList.add("final");
+  const button = document.createElement("button");
+  button.id = "reload-page";
+  button.textContent = "Wczytaj ponownie";
+  button.addEventListener("click", () => location.reload());
+  statusEl.append(" ", button);
+  document.getElementById("map").classList.add("no-webgl");
+}
+
+let viewer;
+try {
+  viewer = openViewer();
+} catch (error) {
+  showGraphicsFailure(error);
+  await new Promise(() => {}); // stops here for good: nothing below can run without the viewer
+}
+function openViewer() {
+  return new Cesium.Viewer("map", {
+    // Not Cesium's English error panel: see showGraphicsFailure.
+    showRenderLoopErrors: false,
+    geocoder: false, // also means the token needs no "geocode" scope
+    baseLayerPicker: false,
+    homeButton: false,
+    sceneModePicker: false,
+    navigationHelpButton: false,
+    animation: false,
+    timeline: false,
+    fullscreenButton: false,
+    infoBox: false,
+    selectionIndicator: false,
+    shadows: true,
+    terrainShadows: Cesium.ShadowMode.RECEIVE_ONLY,
+    // The Google tiles replace the globe entirely. The Geoportal map lays the aerial photo on the surveyed ground.
+    globe: useGoogle ? false : undefined,
+    baseLayer: useGoogle ? false : new Cesium.ImageryLayer(plainHaze()),
+    terrainProvider: useGoogle ? undefined : surveyedGround(),
+  });
+}
 const { scene, camera } = viewer;
+viewer.canvas.addEventListener("webglcontextlost", () => showGraphicsFailure());
+// Rendering has stopped by then, whatever the error.
+scene.renderError.addEventListener((_, error) => showGraphicsFailure(error));
 
 // --- loading progress ----------------------------------------------------------------------
 // "Wczytywanie mapy…" shows a bar and a percentage. Cesium can't know how many tiles a view needs until it has asked for
@@ -511,6 +547,7 @@ document.getElementById(`map-note-${contextName}`).hidden = false;
 // and replaces the status text, button included, on each error. For tiles refused later, see reportRefusedTiles.
 let mapFailed = false; // keeps the message up once the loading message would otherwise be cleared
 function offerGeoportal() {
+  if (statusEl.classList.contains("final")) return; // the other map wouldn't draw either
   const button = document.createElement("button");
   button.id = "fallback-map";
   button.textContent = "Otwórz mapę Geoportal";
@@ -717,77 +754,149 @@ function shapeVolume(s) {
 // Where shapes overlap, the smaller object takes the pointer: the column, say, not the paving round it.
 const byPriority = [...markers].sort((a, b) => a.shapes.reduce((v, s) => v + shapeVolume(s), 0) - b.shapes.reduce((v, s) => v + shapeVolume(s), 0));
 
-// The same tests in GLSL, one function per shape, with the numbers written in. p is the point and n its face's normal,
-// both in local metres.
-const glslNumber = (n) => n.toFixed(4);
-function shapeGLSL(s, name) {
-  const f = glslNumber;
-  const g = (n) => (/[.e]/.test(String(n.toPrecision(9))) ? n.toPrecision(9) : `${n.toPrecision(9)}.0`);
-  const v3 = (a) => `vec3(${a.map(f).join(", ")})`;
-  if (s.type === "ellipsoid") return `bool ${name}(vec3 p, vec3 n) { vec3 q = (p - ${v3(s.centre)}) / ${v3(s.radii)}; return dot(q, q) <= 1.0; }`;
-  if (s.type === "cylinder") {
-    return `bool ${name}(vec3 p, vec3 n) { if (p.z < ${f(s.z[0])} || p.z > ${f(s.z[1])}) return false; return distance(p.xy, vec2(${f(s.xy[0])}, ${f(s.xy[1])})) <= ${f(s.radius)}; }`;
+// The same tests on the GPU. The shapes are data, not code: an older iPad Pro (iOS 17) took over 30 s to compile the
+// shader when each shape was its own GLSL function, about 90 kB of it compiled 20 times over (once per material and
+// pass), and Safari then dropped the WebGL context. Now the shader is the same few lines whatever the markers, and the
+// numbers are in a small texture: one value per texel, in millimetres in 24-bit fixed point in its RGB bytes. Bytes,
+// not floats, because Cesium declares the sampler at the default low precision, which Apple's GPUs honour: a float
+// texture would come back as 16-bit halves there. Bytes come back exact at any precision.
+//
+// The values, in order: the number of ground spots, then x, y, z for each (for drapes); then, for each marker, its shapes:
+//   ellipsoid  0, centre x y z, radii x y z
+//   cylinder   1, z0, z1, centre x y, radius
+//   prism      2, z0, z1, box min x y, box max x y, edge count, then xi yi xj yj for each edge, holes' too
+//   drape      3, the same, with dz0 and dz1 above the ground for z0 and z1
+const SHAPE_SCALE = 1000; // per metre
+const SHAPE_OFFSET = 8000; // metres, so the values from -8000 to 8777 m fit 24 bits
+const SHAPE_TEXTURE_WIDTH = 256; // a power of two, so the texel's row is exact in GLSL
+function shapeTexture(list) {
+  const values = [site.groundSpots.length, ...site.groundSpots.flatMap((s) => [s.x, s.y, s.z])];
+  for (const m of list) {
+    m.shapeStart = values.length;
+    for (const s of m.shapes) {
+      if (s.type === "ellipsoid") values.push(0, ...s.centre, ...s.radii);
+      else if (s.type === "cylinder") values.push(1, ...s.z, ...s.xy, s.radius);
+      else {
+        const xs = s.polygon.map((q) => q[0]);
+        const ys = s.polygon.map((q) => q[1]);
+        const edges = ringsOf(s).flatMap((ring) =>
+          ring
+            .map(([xi, yi], i) => [xi, yi, ...ring[(i + ring.length - 1) % ring.length]])
+            .filter(([, yi, , yj]) => yi !== yj), // an edge along x is never crossed
+        );
+        values.push(s.type === "drape" ? 3 : 2, ...(s.type === "drape" ? s.dz : s.z));
+        values.push(Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys), edges.length, ...edges.flat());
+      }
+    }
   }
-  const xs = s.polygon.map((q) => q[0]);
-  const ys = s.polygon.map((q) => q[1]);
-  const box = `if (p.x < ${f(Math.min(...xs))} || p.x > ${f(Math.max(...xs))} || p.y < ${f(Math.min(...ys))} || p.y > ${f(Math.max(...ys))}) return false;`;
-  const edges = ringsOf(s).flatMap((ring) =>
-    ring.map(([xi, yi], i) => {
-      const [xj, yj] = ring[(i + ring.length - 1) % ring.length];
-      if (yi === yj) return ""; // an edge along x is never crossed
-      return `if ((${f(yi)} > p.y) != (${f(yj)} > p.y) && p.x < ${g((xj - xi) / (yj - yi))} * (p.y - ${f(yi)}) + ${f(xi)}) c = !c;`;
-    }),
-  );
-  const inside = `${box} bool c = false; ${edges.join(" ")}`;
-  if (s.type === "drape") {
-    // Faces turned up only, within 37° of level, and the ground last, as it's the dearest test.
-    return `bool ${name}(vec3 p, vec3 n) { if (n.z < 0.8) return false; ${inside} if (!c) return false; float g = groundAt(p.xy); return p.z >= g + ${f(s.dz[0])} && p.z <= g + ${f(s.dz[1])}; }`;
-  }
-  return `bool ${name}(vec3 p, vec3 n) { if (p.z < ${f(s.z[0])} || p.z > ${f(s.z[1])}) return false; ${inside} return c; }`;
+  const height = Math.ceil(values.length / SHAPE_TEXTURE_WIDTH);
+  const bytes = new Uint8Array(SHAPE_TEXTURE_WIDTH * height * 4);
+  values.forEach((v, i) => {
+    const n = Math.round((v + SHAPE_OFFSET) * SHAPE_SCALE);
+    if (!(n >= 0 && n < 2 ** 24)) throw new Error(`A marker's shape value is out of range: ${v}`);
+    bytes.set([n >> 16, (n >> 8) & 255, n & 255, 255], i * 4);
+  });
+  const texture = new Cesium.TextureUniform({
+    typedArray: bytes,
+    width: SHAPE_TEXTURE_WIDTH,
+    height,
+    repeat: false,
+    minificationFilter: Cesium.TextureMinificationFilter.NEAREST,
+    magnificationFilter: Cesium.TextureMagnificationFilter.NEAREST,
+  });
+  return { texture, height };
 }
 
-// groundAt() in GLSL, for drapes: the same inverse-distance interpolation through the survey's spot heights.
-function groundGLSL() {
-  const f = glslNumber;
-  const terms = site.groundSpots.map((s) => `d = p - vec2(${f(s.x)}, ${f(s.y)}); w = 1.0 / max(dot(d, d), 1e-6); t += w * ${f(s.z)}; ws += w;`);
-  return `float groundAt(vec2 p) { vec2 d; float w; float t = 0.0; float ws = 0.0; ${terms.join(" ")} return t / ws; }`;
-}
+// GLSL numbers for the few constants written into the shader, none of which depend on the markers' count.
+const glslFloat = (n) => (Number.isInteger(n) ? `${n}.0` : String(n));
 
 // A shader for one model, tinting what lies inside the lit marker's shapes. It works in eye coordinates, turned into
 // local metres by a matrix set each frame: model.glb is quantised by gltfpack, so its own coordinates aren't metres.
-// Unlit, it returns at once, and the model looks exactly as without it.
+// Unlit, it returns at once, and the model looks exactly as without it. Its loops run as far as the data says, which
+// GLSL ES 1.00 doesn't allow, so it needs WebGL 2; without it, the pins and popups work but nothing lights up.
 function markerShader(list) {
-  if (list.length === 0) return null;
-  const functions = [];
-  const branches = list.map((m) => {
-    const names = m.shapes.map((s, k) => {
-      functions.push(shapeGLSL(s, `marker${m.index}_${k}`));
-      return `marker${m.index}_${k}(p, n)`;
-    });
-    return `if (lit == ${m.index}) return ${names.join(" || ")};`;
-  });
+  if (list.length === 0 || !scene.context.webgl2) return null;
+  const { texture, height } = shapeTexture(list);
   // Only drapes need the normal, and the map's model may have none.
   const drapes = list.some((m) => m.shapes.some((s) => s.type === "drape"));
   const linear = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
   const colour = `vec3(${[MARK_COLOUR.red, MARK_COLOUR.green, MARK_COLOUR.blue].map((c) => linear(c).toFixed(4)).join(", ")})`;
-  return new Cesium.CustomShader({
+  const shader = new Cesium.CustomShader({
     uniforms: {
-      u_litMarker: { type: Cesium.UniformType.FLOAT, value: -1 },
+      u_shapes: { type: Cesium.UniformType.SAMPLER_2D, value: texture },
+      u_litStart: { type: Cesium.UniformType.FLOAT, value: 0 }, // the lit marker's first value
+      u_litCount: { type: Cesium.UniformType.FLOAT, value: 0 }, // its number of shapes, 0 when none here is lit
       u_litGlow: { type: Cesium.UniformType.FLOAT, value: 0 },
       u_eyeToLocal: { type: Cesium.UniformType.MAT4, value: new Cesium.Matrix4() },
     },
     fragmentShaderText: `
-${drapes ? groundGLSL() : ""}
-${functions.join("\n")}
-bool inLitMarker(vec3 p, vec3 n, int lit) {
-  ${branches.join("\n  ")}
+float shapeValue(float i) {
+  vec2 texel = vec2(mod(i, ${glslFloat(SHAPE_TEXTURE_WIDTH)}), floor(i / ${glslFloat(SHAPE_TEXTURE_WIDTH)}));
+  // At level 0: the lookups are in loops and branches, where the screen derivatives for picking a level are undefined.
+  vec3 b = floor(textureLod(u_shapes, (texel + 0.5) / vec2(${glslFloat(SHAPE_TEXTURE_WIDTH)}, ${glslFloat(height)}), 0.0).rgb * 255.0 + 0.5);
+  return (b.r * 65536.0 + b.g * 256.0 + b.b) / ${glslFloat(SHAPE_SCALE)} - ${glslFloat(SHAPE_OFFSET)};
+}
+int shapeCount(float i) { return int(shapeValue(i) + 0.5); }
+// The same inverse-distance interpolation through the survey's spot heights as groundAt() in main.js.
+float groundAt(vec2 p) {
+  float t = 0.0;
+  float ws = 0.0;
+  int spots = shapeCount(0.0);
+  for (int k = 0; k < spots; k++) {
+    float i = 1.0 + 3.0 * float(k);
+    vec2 d = p - vec2(shapeValue(i), shapeValue(i + 1.0));
+    float w = 1.0 / max(dot(d, d), 1e-6);
+    t += w * shapeValue(i + 2.0);
+    ws += w;
+  }
+  return t / ws;
+}
+// Counts the edges crossed on the way out, as inShape() does.
+bool inPolygon(vec2 p, float i, int edges) {
+  bool c = false;
+  for (int k = 0; k < edges; k++) {
+    float e = i + 4.0 * float(k);
+    float xi = shapeValue(e);
+    float yi = shapeValue(e + 1.0);
+    float xj = shapeValue(e + 2.0);
+    float yj = shapeValue(e + 3.0);
+    if ((yi > p.y) != (yj > p.y) && p.x < (xj - xi) * (p.y - yi) / (yj - yi) + xi) c = !c;
+  }
+  return c;
+}
+// p is the point and n its face's normal, both in local metres.
+bool inLitMarker(vec3 p, vec3 n) {
+  float i = u_litStart;
+  int count = int(u_litCount + 0.5);
+  for (int s = 0; s < count; s++) {
+    int type = shapeCount(i);
+    if (type == 0) {
+      vec3 q = (p - vec3(shapeValue(i + 1.0), shapeValue(i + 2.0), shapeValue(i + 3.0))) / vec3(shapeValue(i + 4.0), shapeValue(i + 5.0), shapeValue(i + 6.0));
+      if (dot(q, q) <= 1.0) return true;
+      i += 7.0;
+    } else if (type == 1) {
+      if (p.z >= shapeValue(i + 1.0) && p.z <= shapeValue(i + 2.0) && distance(p.xy, vec2(shapeValue(i + 3.0), shapeValue(i + 4.0))) <= shapeValue(i + 5.0)) return true;
+      i += 6.0;
+    } else {
+      int edges = shapeCount(i + 7.0);
+      bool inBox = p.x >= shapeValue(i + 3.0) && p.y >= shapeValue(i + 4.0) && p.x <= shapeValue(i + 5.0) && p.y <= shapeValue(i + 6.0);
+      if (type == 2) {
+        if (inBox && p.z >= shapeValue(i + 1.0) && p.z <= shapeValue(i + 2.0) && inPolygon(p.xy, i + 8.0, edges)) return true;
+      } else if (inBox && n.z >= 0.8 && inPolygon(p.xy, i + 8.0, edges)) {
+        // A drape: faces turned up only, within 37° of level, and the ground last, as it's the dearest test.
+        float g = groundAt(p.xy);
+        if (p.z >= g + shapeValue(i + 1.0) && p.z <= g + shapeValue(i + 2.0)) return true;
+      }
+      i += 8.0 + 4.0 * float(edges);
+    }
+  }
   return false;
 }
 void fragmentMain(FragmentInput fsInput, inout czm_modelMaterial material) {
-  if (u_litMarker < 0.0) return;
+  if (u_litCount < 0.5) return;
   vec3 p = (u_eyeToLocal * vec4(fsInput.attributes.positionEC, 1.0)).xyz;
   vec3 n = ${drapes ? "normalize((u_eyeToLocal * vec4(fsInput.attributes.normalEC, 0.0)).xyz)" : "vec3(0.0, 0.0, 1.0)"};
-  if (!inLitMarker(p, n, int(u_litMarker + 0.5))) return;
+  if (!inLitMarker(p, n)) return;
   // Lighter and a little warmer, not recoloured: mixing in yellow turned the trees' dark green olive.
   material.diffuse *= vec3(1.5, 1.45, 1.0);
   // More for thin, dark things, the lamps' poles, on which lightening hardly shows.
@@ -796,6 +905,8 @@ void fragmentMain(FragmentInput fsInput, inout czm_modelMaterial material) {
   material.alpha = mix(material.alpha, 1.0, 0.4);
 }`,
   });
+  for (const m of list) m.shader = shader;
+  return shader;
 }
 const STRONG_GLOW = 0.5; // for `highlight: strong` in the spec, added to the yellow's emission
 const modelShader = markerShader(markers.filter((m) => !m.map));
@@ -999,8 +1110,10 @@ function updateHighlight() {
   const lit = [hoveredPin, hoveredObject, openMarker].find((i) => i !== null) ?? null;
   litIndex = lit !== null && objectShown(markers[lit]) ? lit : -1;
   for (const shader of markerShaders) {
-    shader.setUniform("u_litMarker", litIndex);
-    shader.setUniform("u_litGlow", litIndex >= 0 && markers[litIndex].strong ? STRONG_GLOW : 0);
+    const m = litIndex >= 0 && markers[litIndex].shader === shader ? markers[litIndex] : null;
+    shader.setUniform("u_litStart", m ? m.shapeStart : 0);
+    shader.setUniform("u_litCount", m ? m.shapes.length : 0);
+    shader.setUniform("u_litGlow", m?.strong ? STRONG_GLOW : 0);
   }
   for (const [index, primitive] of classifications) primitive.show = index === litIndex;
   for (const m of markers) m.head.classList.toggle("lit", m.index === lit);

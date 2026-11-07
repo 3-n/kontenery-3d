@@ -5,6 +5,15 @@ body { font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; 
 #map canvas { transition: opacity 0.4s; }
 #map.loading canvas { opacity: 0; }
 #map.loading ~ #status { bottom: 50%; }
+/* When the browser can't draw the map (showGraphicsFailure in main.js): the link preview's picture of the overview, and
+   nothing that belongs to the 3D view. The picture's own credit is cropped off on narrow screens, so it's written here. */
+#map.no-webgl { background: url("preview.jpg") center / cover; position: relative; }
+#map.no-webgl::after {
+  content: "Ortofotomapa, budynki i drzewa 3D: GUGiK, geoportal.gov.pl";
+  position: absolute; right: 0; bottom: 0; padding: 2px 6px; font-size: 11px; background: rgba(255, 255, 255, 0.85);
+}
+#map.no-webgl .cesium-viewer, #map.no-webgl ~ #pins, #map.no-webgl ~ #info, #map.no-webgl ~ #reset-view { display: none; }
+#map.no-webgl ~ #status { bottom: 50%; transform: translate(-50%, 50%); width: 440px; }
 
 #panel, #info, #status {
   position: absolute;

@@ -121,6 +121,7 @@
     for (const type of ["error", "unhandledrejection"]) {
       addEventListener(type, (event) => {
         const status = document.getElementById("status");
+        if (status.classList.contains("final")) return; // the 3D map has failed for good: see showGraphicsFailure in main.js
         const error = event.reason ?? event.error;
         const code = error?.statusCode ? `serwer mapy odpowiedział kodem ${error.statusCode}` : null;
         const detail = error?.message ?? code ?? event.message ?? "nieznany błąd";
