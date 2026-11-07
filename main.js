@@ -494,6 +494,8 @@ function switchMap(name) {
       date: document.getElementById("date").value.slice(5),
       time: Number(document.getElementById("time").value),
       project: document.getElementById("project").checked,
+      // From the page, as above: a failed Google map offers this switch before the rest of this file has run.
+      markers: document.getElementById("markers-toggle").getAttribute("aria-checked") === "true",
     }),
   );
   location.href = url;
@@ -969,7 +971,11 @@ let openMarker = null;
 
 // A pin goes with its object when the project is hidden, unless that's already there. On the Google map the map's
 // objects on the project's paving go with the cut under it, so there they light up only with the project hidden.
-const pinShown = (m) => !m.project || projectBox.checked;
+// "Pokaż oznaczenia" off takes every pin away, and with them the objects' highlight and popups, for just looking at the
+// model (Jarek, 2026-11-07: busy on a phone).
+const markersToggle = document.getElementById("markers-toggle");
+const markersOn = () => markersToggle.getAttribute("aria-checked") === "true";
+const pinShown = (m) => markersOn() && (!m.project || projectBox.checked);
 const objectShown = (m) => pinShown(m) && !(m.map && useGoogle && projectBox.checked);
 
 // What a pin's head shows, and the popup's label with it: the plan's number or "?", an icon, or for a surface a swatch
@@ -1020,6 +1026,19 @@ projectBox.addEventListener("change", () => {
   if (openMarker !== null && !pinShown(markers[openMarker])) openPopup(null);
   updateHighlight();
 });
+// The heads hide on the next frame (preRender), without a pointerleave, so whatever was pointed at is let go here.
+function showMarkers(on) {
+  markersToggle.setAttribute("aria-checked", String(on));
+  if (!on) {
+    hoveredPin = hoveredObject = null;
+    scene.canvas.style.cursor = "";
+  }
+  if (openMarker !== null && !pinShown(markers[openMarker])) openPopup(null);
+  updateHighlight();
+}
+markersToggle.addEventListener("click", () => showMarkers(!markersOn()));
+// From the map switch. Nothing is pointed at or open yet, and the heads don't exist, so the setting alone will do.
+if (switchState?.markers === false) markersToggle.setAttribute("aria-checked", "false");
 
 // The object under a position on the canvas: the point of the map or model there, inside one of the shapes. Whatever
 // stands in front, a building or another tree, is what's found instead, so objects count only where they can be seen.
