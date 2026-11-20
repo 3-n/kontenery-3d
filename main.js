@@ -1056,8 +1056,8 @@ function showProject(show) {
       if (!show && cuts.contains(cut)) cuts.remove(cut);
     }
   }
-  // On the Geoportal map, GUGiK's trees where the project paves or builds come back, as the Google map's own trees do
-  // when its cut is lifted.
+  // On the Geoportal map, GUGiK's trees that the project fells, or where it paves or builds, come back, as the Google map's
+  // own trees do when its cut is lifted.
   if (surroundings?.ready) {
     for (const part of ["crowns", "trunks"]) {
       const node = surroundings.getNode(`Project-site tree ${part}`);
@@ -1087,7 +1087,9 @@ let openMarker = null;
 const markersToggle = document.getElementById("markers-toggle");
 const markersOn = () => markersToggle.getAttribute("aria-checked") === "true";
 const pinShown = (m) => markersOn() && (!m.project || projectBox.checked);
-const objectShown = (m) => pinShown(m) && !(m.map && useGoogle && projectBox.checked);
+// A map's own object can't be lit while the project hides it: on the Google map the project's cut takes it out, and on the
+// Geoportal map the trees the project fells are shown only with the project hidden (site_trees.json's `felled`).
+const objectShown = (m) => pinShown(m) && !(m.map && projectBox.checked && (useGoogle || siteTrees?.felled));
 
 // What a pin's head shows, and the popup's label with it: the plan's number or "?", an icon, or for a surface a swatch
 // like the plan's legend. The icons are drawn in the heads' text colour.
@@ -1095,6 +1097,10 @@ const PIN_ICONS = {
   lamp: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5a6.5 6.5 0 0 0-3.9 11.7c.6.5.9 1.2.9 1.9v1.4h6v-1.4c0-.7.3-1.4.9-1.9A6.5 6.5 0 0 0 12 2.5zM10 20.5h4"/></svg>',
   bike: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5.5" cy="15.5" r="3.5"/><circle cx="18.5" cy="15.5" r="3.5"/><path d="M5.5 15.5 9 8.5l3 7H5.5M9 8.5h6.5L12 15.5M15.5 8.5l3 7M7.5 6.5h3M15.5 8.5 15 6h2"/></svg>',
   tree: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7.5 14.5A3.5 3.5 0 0 1 6.2 8.2 4.5 4.5 0 0 1 12 3.5a4.5 4.5 0 0 1 5.8 4.7 3.5 3.5 0 0 1-1.3 6.3z"/><path d="M12 14.5V21"/></svg>',
+  // The tree, in outline and struck through: the trees the project fells.
+  felled: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.5 14.5A3.5 3.5 0 0 1 6.2 8.2 4.5 4.5 0 0 1 12 3.5a4.5 4.5 0 0 1 5.8 4.7 3.5 3.5 0 0 1-1.3 6.3z"/><path d="M12 14.5V21M3.5 20.5 20.5 3.5"/></svg>',
+  // A low clipped hedge on the ground.
+  hedge: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 17.5c0-2.6 1.8-4.6 4-4.6.7-1.7 2.6-2.9 5-2.9s4.3 1.2 5 2.9c2.2 0 4 2 4 4.6z"/><path d="M2.5 20.5h19"/></svg>',
   // The legend's swatches, in a yellow head like the rest, so that grey still means hidden.
   deck: '<span class="swatch swatch-deck"></span>',
   paving: '<span class="swatch swatch-paving"></span>',
