@@ -30,7 +30,7 @@ To nieoficjalna wizualizacja poglądowa, a nie dokument projektowy.
 ## Znane ograniczenia
 
 - Mapa jest wycięta pod projektowanymi nawierzchniami, razem z fragmentami koron drzew nad nimi.
-- Projekt przewiduje wycinkę 18 drzew rosnących w ogrodzeniu od strony północno-wschodniej. Na mapie Geoportal znikają po włączeniu projektu. Na mapie Google są częścią sfotografowanej siatki, więc widać je nadal. Pozostałe drzewa zostają.
+- Projekt przewiduje wycinkę 18 drzew rosnących w ogrodzeniu od strony północno-wschodniej. Na mapie Geoportal znikają po włączeniu projektu. Na mapie Google są częścią sfotografowanej siatki, więc widać je nadal. Pozostałe drzewa zostają, poza jednym młodym drzewem na trasie nowej ścieżki przy szlabanie: projekt nie mówi, co się z nim stanie, więc model pokazuje je tylko bez projektu.
 - Nowe drzewa są pokazane kilka lat po posadzeniu (4,4 m; sadzone mają 3,5–4 m), a żywopłot tuż po posadzeniu.
 - „Pokaż projekt” chowa tylko projekt: tężnia z nawierzchnią i młode drzewa wzdłuż ścieżki już są, więc zostają. Na mapie Geoportal przywraca też drzewa przeznaczone do wycinki.
 - Okna są nieprzezroczyste, bo wnętrze budynku nie jest modelowane.

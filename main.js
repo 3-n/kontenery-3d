@@ -1045,10 +1045,16 @@ function reportRefusedTiles(tileset) {
 const projectBox = document.getElementById("project");
 // What "Pokaż projekt" hides: the model's groups from blender/build.py, whose names scripts/check_model.py checks. Not
 // "Existing", the tężnia and its paving, which are already there, nor "Backing", which belongs to the Google map.
+// "Removed" works the other way round: what stands today where the project builds, shown only with the project hidden.
 const PROJECT_NODES = ["Building", "Site", "Furniture", "Trees"];
 
 function showProject(show) {
-  if (model.ready) for (const name of PROJECT_NODES) model.getNode(name).show = show;
+  if (model.ready) {
+    for (const name of PROJECT_NODES) model.getNode(name).show = show;
+    // What stands today where the project builds: a young tree in the new path (spec objects with removed: true).
+    const removed = model.getNode("Removed");
+    if (removed) removed.show = !show;
+  }
   const cuts = tileset?.clippingPolygons;
   if (cuts) {
     for (const cut of projectCuts) {
