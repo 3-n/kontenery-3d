@@ -21,6 +21,8 @@
   <script defer src="https://cdn.jsdelivr.net/npm/cesium@1.147.0/Build/Cesium/Cesium.js"></script>
   <link href="https://cdn.jsdelivr.net/npm/cesium@1.147.0/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
   <link href="./style.css" rel="stylesheet">
+  <!-- GoatCounter's settings and window.track, for the events: before count.js at the end of the page and main.js. -->
+  <script src="./analytics.js"></script>
   <link rel="icon" href="data:,">
 </head>
 <body>
@@ -125,6 +127,18 @@
         const target = Math.min(bottom + gap - panel.clientHeight, top - gap);
         panel.scrollTo({ top: target, behavior: reduceMotion.matches ? "auto" : "smooth" });
       }, true);
+      // GoatCounter events (analytics.js) for the sections opened. None of them starts open, so each toggle to open is
+      // a visitor's.
+      const SECTION_EVENTS = { about: "about-model", author: "about-author", sun: "sun-open" };
+      panel.addEventListener("toggle", (event) => {
+        if (event.target.open && SECTION_EVENTS[event.target.id]) window.track?.(SECTION_EVENTS[event.target.id]);
+      }, true);
+      // The panel itself starts open on a wide screen and is folded here on a phone, and both fire a toggle, so its
+      // opening is counted from the click on its title instead. A click among the view buttons there is cancelled above
+      // and doesn't open it.
+      panel.querySelector(":scope > summary").addEventListener("click", (event) => {
+        if (!event.defaultPrevented && !panel.open) window.track?.("panel-open");
+      });
     }
   </script>
 
@@ -147,6 +161,11 @@
         const status = document.getElementById("status");
         if (status.classList.contains("final")) return; // the 3D map has failed for good: see showGraphicsFailure in main.js
         const error = event.reason ?? event.error;
+        // Once per page: the errors that follow the first don't count again.
+        if (!window.loadErrorTracked) {
+          window.loadErrorTracked = true;
+          window.track?.("load-error", error?.statusCode ? `http-${error.statusCode}` : error?.name);
+        }
         const code = error?.statusCode ? `serwer mapy odpowiedział kodem ${error.statusCode}` : null;
         const detail = error?.message ?? code ?? event.message ?? "nieznany błąd";
         status.classList.remove("progress");
@@ -157,5 +176,6 @@
     }
   </script>
   <script type="module" src="./main.js"></script>
+  <script data-goatcounter="https://3-n.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
 </body>
 </html>

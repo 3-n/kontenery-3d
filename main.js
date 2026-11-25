@@ -14,6 +14,10 @@ const asked = (isLocal && params.get("context")) || params.get("map");
 const contextName = MAPS.includes(asked) ? asked : isLocal ? config.localContext : config.context;
 const useGoogle = contextName === "google";
 const isSmallScreen = matchMedia("(max-width: 640px)").matches;
+// GoatCounter events: see analytics.js. Never throws, whether or not GoatCounter is there.
+const track = (name, title) => window.track?.(name, title);
+// Opened from a link with ?map= in it, not from the page's own switch, which also puts the camera in ?state=.
+if (MAPS.includes(params.get("map")) && !params.has("state")) track(`entry-map-${contextName}`);
 
 const [site, siteTrees] = await Promise.all([
   fetch("./site.json").then((r) => r.json()),
@@ -186,9 +190,10 @@ function orthophotos() {
 // and then refuses it to the page until the browser is restarted. Cesium can't come back from either, so the page says
 // so in Polish, instead of Cesium's English panel or a loading bar that stops, and shows the link preview's picture of
 // the overview. The message is final: the errors that follow a lost context would otherwise replace it.
-function showGraphicsFailure(error) {
+function showGraphicsFailure(error, reason = "webgl-render-error") {
   if (error) console.error(error);
   if (statusEl.classList.contains("final")) return;
+  track(reason);
   setStatus(
     "Nie udało się wyświetlić modelu 3D: ta przeglądarka nie poradziła sobie z grafiką 3D (WebGL) albo ją wyłączyła. " +
       "W tle jest widok ogólny jako zdjęcie. Zamknij przeglądarkę całkowicie i otwórz stronę jeszcze raz albo otwórz ją na innym urządzeniu.",
@@ -206,7 +211,7 @@ let viewer;
 try {
   viewer = openViewer();
 } catch (error) {
-  showGraphicsFailure(error);
+  showGraphicsFailure(error, "webgl-unsupported");
   await new Promise(() => {}); // stops here for good: nothing below can run without the viewer
 }
 function openViewer() {
@@ -232,7 +237,7 @@ function openViewer() {
   });
 }
 const { scene, camera } = viewer;
-viewer.canvas.addEventListener("webglcontextlost", () => showGraphicsFailure());
+viewer.canvas.addEventListener("webglcontextlost", () => showGraphicsFailure(null, "webgl-context-lost"));
 // Rendering has stopped by then, whatever the error.
 scene.renderError.addEventListener((_, error) => showGraphicsFailure(error));
 
@@ -468,12 +473,18 @@ scene.postRender.addEventListener(() => {
   }
   if (resetButton.hidden === away) resetButton.hidden = !away;
 });
-resetButton.addEventListener("click", () => goTo(activeView));
+resetButton.addEventListener("click", () => {
+  track("view-reset");
+  goTo(activeView);
+});
 for (const view of site.cameras) {
   const button = document.createElement("button");
   button.textContent = view.label;
   button.dataset.id = view.id;
-  button.addEventListener("click", () => goTo(view.id));
+  button.addEventListener("click", () => {
+    if (view.id !== activeView) track(`view-switch-${view.id}`);
+    goTo(view.id);
+  });
   cameraButtons.append(button);
 }
 goTo(config.initialCamera, 0);
@@ -538,7 +549,12 @@ function switchMap(name) {
 }
 for (const button of document.querySelectorAll("#maps button")) {
   button.classList.toggle("active", button.dataset.map === contextName);
-  if (button.dataset.map !== contextName) button.addEventListener("click", () => switchMap(button.dataset.map));
+  if (button.dataset.map !== contextName) {
+    button.addEventListener("click", () => {
+      track(`map-switch-${button.dataset.map}`);
+      switchMap(button.dataset.map);
+    });
+  }
 }
 document.getElementById(`map-note-${contextName}`).hidden = false;
 
@@ -551,7 +567,10 @@ function offerGeoportal() {
   const button = document.createElement("button");
   button.id = "fallback-map";
   button.textContent = "Otwórz mapę Geoportal";
-  button.addEventListener("click", () => switchMap("geoportal"));
+  button.addEventListener("click", () => {
+    track("map-fallback-geoportal");
+    switchMap("geoportal");
+  });
   statusEl.append(" ", button);
 }
 if (useGoogle) {
@@ -611,19 +630,25 @@ const year = new Date().getFullYear();
 // The defaults, unless the map switch carried a setting over.
 dateInput.value = `${year}-${/^\d\d-\d\d$/.test(switchState?.date) ? switchState.date : DEFAULT_DATE}`;
 timeInput.value = Number.isFinite(switchState?.time) ? switchState.time : DEFAULT_TIME;
+const SUN_PRESETS = { "03-20": "equinox", "06-21": "summer", "12-21": "winter" };
 for (const b of dateButtons) {
   b.addEventListener("click", () => {
+    track(`sun-date-${SUN_PRESETS[b.dataset.date] ?? "preset"}`);
     dateInput.value = `${year}-${b.dataset.date}`;
     applyTime();
   });
 }
 sunReset.addEventListener("click", () => {
+  track("sun-reset");
   dateInput.value = `${year}-${DEFAULT_DATE}`;
   timeInput.value = DEFAULT_TIME;
   applyTime();
 });
 dateInput.addEventListener("input", applyTime);
 timeInput.addEventListener("input", applyTime);
+// "change", not "input": once when the slider or the date is let go, not for every step of a drag.
+timeInput.addEventListener("change", () => track("sun-time"));
+dateInput.addEventListener("change", (event) => event.isTrusted && track("sun-date-custom"));
 applyTime();
 
 // --- map context ----------------------------------------------------------------------
@@ -1034,6 +1059,7 @@ function reportRefusedTiles(tileset) {
     failedTiles++;
     if (mapFailed || failedTiles < 3 || failedTiles <= loadedTiles) return;
     mapFailed = true;
+    track("map-google-tiles-refused", code ? `http-${code}` : undefined);
     // Cesium's message can end "Status Code: 429", but for tiles it's usually just "Request has failed."
     const code = String(message).match(/Status Code: (\d+)/)?.[1];
     setStatus(`Nie udało się wczytać mapy Google: serwer mapy ${code ? `odpowiedział kodem ${code}` : "odrzuca zapytania"}.`);
@@ -1075,6 +1101,8 @@ function showProject(show) {
 whenReady(model).then(() => showProject(projectBox.checked));
 surroundingsReady.then(() => showProject(projectBox.checked));
 projectBox.addEventListener("change", (event) => showProject(event.target.checked));
+// Only the visitor's own clicks: the map switch below sets the box and dispatches "change" itself.
+projectBox.addEventListener("change", (event) => event.isTrusted && track(projectBox.checked ? "project-show" : "project-hide"));
 if (switchState?.project === false) {
   projectBox.checked = false;
   projectBox.dispatchEvent(new Event("change"));
@@ -1131,6 +1159,15 @@ function updateHighlight() {
   for (const m of markers) m.head.classList.toggle("lit", m.index === lit);
 }
 
+// A pin's or an object's click: counted when it opens a popup that wasn't open already.
+function openPopupByClick(index) {
+  if (index !== null && index !== openMarker) {
+    const m = markers[index];
+    track(`object-open-${String(m.id).toLowerCase().replace(/[^a-z0-9]+/g, "-")}`, m.title);
+  }
+  openPopup(index);
+}
+
 function openPopup(index) {
   openMarker = index;
   info.hidden = index === null;
@@ -1161,7 +1198,10 @@ function showMarkers(on) {
   if (openMarker !== null && !pinShown(markers[openMarker])) openPopup(null);
   updateHighlight();
 }
-markersToggle.addEventListener("click", () => showMarkers(!markersOn()));
+markersToggle.addEventListener("click", () => {
+  track(markersOn() ? "markers-hide" : "markers-show");
+  showMarkers(!markersOn());
+});
 // From the map switch. Nothing is pointed at or open yet, and the heads don't exist, so the setting alone will do.
 if (switchState?.markers === false) markersToggle.setAttribute("aria-checked", "false");
 
@@ -1226,7 +1266,7 @@ for (const m of markers) {
   m.head.addEventListener("pointerleave", hover(false));
   m.head.addEventListener("focus", hover(true));
   m.head.addEventListener("blur", hover(false));
-  m.head.addEventListener("click", () => openPopup(m.index));
+  m.head.addEventListener("click", () => openPopupByClick(m.index));
   pinsLayer.append(m.head);
 }
 
@@ -1391,7 +1431,7 @@ scene.postRender.addEventListener(() => {
 // which draws the pins' lines into the depth read here, so a click on an object behind a line found the line.
 viewer.screenSpaceEventHandler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_CLICK);
 viewer.screenSpaceEventHandler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
-new Cesium.ScreenSpaceEventHandler(viewer.canvas).setInputAction((click) => openPopup(markerAt(click.position)), Cesium.ScreenSpaceEventType.LEFT_CLICK);
+new Cesium.ScreenSpaceEventHandler(viewer.canvas).setInputAction((click) => openPopupByClick(markerAt(click.position)), Cesium.ScreenSpaceEventType.LEFT_CLICK);
 
 if (!clippingSupported) {
   console.warn("Clipping polygons are not supported here: the old map mesh stays visible under the project.");
