@@ -87,8 +87,8 @@
     <!-- Jarek's own words (2026-11-25), as in the README's "Autor". -->
     <details id="author">
       <summary>O autorze</summary>
-      <p>Wizualizację przygotował społecznie Jarek Gliwiński, żeby łatwo było każdemu zobaczyć plan osadzony w rzeczywistym otoczeniu bez analizy dokumentów. Niekomercyjnie, non-profit, bez reklam.</p>
-      <p>Nie jestem w żaden sposób związany z projektantami ani (w szczególności!) Urzędem Dzielnicy. Obecnie działam w Radzie Osiedla Kamionek.
+      <p>Wizualizację przygotował Jarek Gliwiński. Społecznie, niekomercyjnie, non-profit, bez reklam.</p>
+      <p>Nie jestem w żaden sposób związany z projektantami ani (w szczególności!) Urzędem Dzielnicy. Ani jakimkolwiek innym urzędem. Obecnie działam w Radzie Osiedla Kamionek.
       </p>
     </details>
   </details>
@@ -111,6 +111,20 @@
       phone.addEventListener("change", placeViews);
       // In the title, a tap here (between buttons, say) would fold or unfold the panel. The buttons still work.
       views.addEventListener("click", (event) => event.preventDefault());
+      // Once the panel scrolls, a section opened near its bottom would unfold out of sight: in Safari, not one line of
+      // "O autorze" showed (Jarek, 2026-11-25). So the panel scrolls to show the section, all of it if it fits, or else
+      // from its title down. A section's toggle doesn't bubble, hence the capture.
+      const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
+      panel.addEventListener("toggle", (event) => {
+        const section = event.target;
+        if (section === panel || !section.open) return;
+        const gap = 10;
+        const top = section.getBoundingClientRect().top - panel.getBoundingClientRect().top - panel.clientTop + panel.scrollTop;
+        const bottom = top + section.offsetHeight;
+        if (bottom + gap <= panel.scrollTop + panel.clientHeight) return;
+        const target = Math.min(bottom + gap - panel.clientHeight, top - gap);
+        panel.scrollTo({ top: target, behavior: reduceMotion.matches ? "auto" : "smooth" });
+      }, true);
     }
   </script>
 

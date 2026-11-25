@@ -48,6 +48,6 @@ Dane mapy: Google, widoczne na stronie razem z logo. Silnik: [CesiumJS](https://
 
 ## Autor
 
-Wizualizację przygotował społecznie Jarek Gliwiński, żeby łatwo było każdemu zobaczyć plan osadzony w rzeczywistym otoczeniu bez analizy dokumentów. Niekomercyjnie, non-profit, bez reklam.
+Wizualizację przygotował Jarek Gliwiński. Społecznie, niekomercyjnie, non-profit, bez reklam.
 
-Nie jestem w żaden sposób związany z projektantami ani (w szczególności!) Urzędem Dzielnicy. Obecnie działam w Radzie Osiedla Kamionek.
+Nie jestem w żaden sposób związany z projektantami ani (w szczególności!) Urzędem Dzielnicy. Ani jakimkolwiek innym urzędem. Obecnie działam w Radzie Osiedla Kamionek.
