@@ -4,6 +4,8 @@ Strona pokazuje projektowany kontenerowy budynek usługowy z zagospodarowaniem t
 
 To nieoficjalna wizualizacja poglądowa, a nie dokument projektowy.
 
+Model powstał wyłącznie na podstawie publicznych dokumentów i ogólnodostępnych map. Zbudowano z pomocą narzędzi AI, model jest więc poglądowy, może zawierać błędy i przekłamania, chociaż starałem się wszystkie znaleźć.
+
 ## Skąd są dane
 
 - **Bryła i zagospodarowanie:** projekt budowlany zatwierdzony decyzją nr 142/PPD/PB/2026 (rysunki Z-01, A-01 do A-04), projekt techniczny z dokumentacji przetargowej (rysunki A-01 i Z-01, opis techniczny i opis zieleni) oraz mapa do celów projektowych z 15.07.2026. Tam, gdzie się różnią, obowiązuje nowszy projekt techniczny.
@@ -43,3 +45,9 @@ To nieoficjalna wizualizacja poglądowa, a nie dokument projektowy.
 ## Uznanie autorstwa
 
 Dane mapy: Google, widoczne na stronie razem z logo. Silnik: [CesiumJS](https://cesium.com/platform/cesiumjs/) (Apache 2.0), przez Cesium ion. Mapa Geoportal: ortofotomapa oraz modele 3D budynków i drzew GUGiK z geoportal.gov.pl, przetworzone jak opisano wyżej.
+
+## Autor
+
+Wizualizację przygotował społecznie Jarek Gliwiński, żeby łatwo było każdemu zobaczyć plan osadzony w rzeczywistym otoczeniu bez analizy dokumentów. Niekomercyjnie, non-profit, bez reklam.
+
+Nie jestem w żaden sposób związany z projektantami ani (w szczególności!) Urzędem Dzielnicy. Obecnie działam w Radzie Osiedla Kamionek.
